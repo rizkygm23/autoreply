@@ -304,6 +304,101 @@ ${tambahan}
   }
 });
 
+// === Generate Topic (Discord)
+// Body: { roomId: string, hint?: string, examples: Array<{username, reply}> }
+// === Generate Topic (Discord) — versi "conversation topics"
+// === Generate Topic (Discord) — SINGLE SHORT OPENER (one message only)
+app.post("/generate-topic", async (req, res) => {
+  const { roomId, hint = "", examples = [] } = req.body || {};
+  const spinner = startSpinner(`${req._id} /generate-topic`, "AI thinking");
+
+  try {
+    if (!roomId) {
+      spinner.stop(false, `${COLORS.red}bad request${COLORS.reset}`);
+      return res.status(400).json({ error: "roomId is required" });
+    }
+
+    // Ambil maksimal 10 pesan sekitar sebagai konteks
+    const sample = (Array.isArray(examples) ? examples : []).slice(0, 10);
+    const sampleText = sample
+      .map((m, i) => `${i + 1}. ${m.username}: ${sanitizeText(m.reply || "")}`)
+      .join("\n");
+
+    // Kosakata komunitas (opsional)
+    const COMMUNITY_VOCAB = {
+      cys: ["Cysors", "gmsor", "fam", "gm", "wen", "zk"],
+      mmt: ["MMT", "fam", "gm"],
+      fgo: ["Fogo", "gm", "fam"],
+      rialo: ["Rialo", "gm", "fam"],
+      fastTest: ["gm", "fam"],
+    };
+    const vocab = COMMUNITY_VOCAB[roomId] || ["gm", "fam"];
+
+    // Prompt: hasil HARUS satu kalimat pendek saja, tanpa koma, tanpa list
+    const prompt = `
+You create ONE MICRO-OPENER for a Discord chat in the "${roomId}" community.
+
+Requirements:
+- Output EXACTLY ONE short topic starter (2–8 words), natural and casual.
+- It should be something a user can send as a single message (e.g., greet, quick check-in, simple ask, light invite).
+- If natural, you may use community vocabulary: ${vocab.join(", ")}.
+- No emojis, no usernames, no hashtags, no links.
+- Do NOT use the symbols — or - anywhere.
+- Do NOT use commas. Do NOT output multiple sentences. One sentence only.
+- Match the vibe of recent messages.
+
+Output format:
+- ONE line only, the message itself.
+- No quotes, no bullets, no numbering, no extra text, no line breaks.
+
+Style example (do NOT copy literally):
+How are you doing?
+
+Recent messages:
+${sampleText || "(no messages)"}
+
+Optional user hint (may be empty):
+${sanitizeText(hint)}
+
+Now output exactly ONE short message (2–8 words), no commas.
+`.trim();
+
+    const raw = await generateReplyFromGrok(prompt) || "";
+
+    // Normalisasi ke satu kalimat pendek
+    let line = raw.replace(/[\r\n]+/g, " ").trim();
+    line = line.replace(/^["'“”`]+|["'“”`]+$/g, "");   // buang kutip pembungkus
+    line = line.replace(/[—-]+/g, " ");                 // larang em-dash/hyphen → spasi
+    line = line.replace(/\s+/g, " ").trim();
+
+    // Validasi: satu pesan saja, tanpa koma, panjang wajar
+    const wordCount = line ? line.split(/\s+/).length : 0;
+    const invalid = !line || /,/.test(line) || wordCount < 2 || wordCount > 8;
+
+    if (invalid) {
+      // fallback sederhana per-room
+      const FALLBACK = {
+        cys: "How are you doing?",
+        mmt: "How are you doing?",
+        fgo: "What’s good today?",
+        rialo: "How are you doing?",
+        fastTest: "How are you doing?",
+        default: "How are you doing?",
+      };
+      line = FALLBACK[roomId] || FALLBACK.default;
+    }
+
+    spinner.stop(true, `${COLORS.green}ok${COLORS.reset}`);
+    return res.json({ topic: line });
+  } catch (err) {
+    spinner.stop(false, `${COLORS.red}error${COLORS.reset}`);
+    logErr(`${COLORS.cyan}${req._id}${COLORS.reset} Error (/generate-topic): ${err?.message || err}`);
+    return res.status(500).json({ error: "Failed to generate topic" });
+  }
+});
+
+
+
 // === Parafrase (perbaiki bahasa Inggris)
 app.post("/generate-parafrase", async (req, res) => {
   const spinner = startSpinner(`${req._id} /generate-parafrase`, "AI thinking");

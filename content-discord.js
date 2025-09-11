@@ -70,21 +70,18 @@ function setBtnLoading(btn, isLoading, doneText) {
 // (bukan preview dari replied/quoted message)
 // ===================================================
 function getMainContentEl(messageEl) {
-  // 1) Via aria-labelledby → "message-content-XXXX"
   const labelled = (messageEl.getAttribute('aria-labelledby') || '').split(/\s+/);
   const contentId = labelled.find(s => s.startsWith('message-content-'));
   if (contentId) {
     const el = document.getElementById(contentId);
     if (el) return el;
   }
-  // 2) Fallback: ambil semua message-content tapi exclude yang di replied block
   const candidates = Array.from(messageEl.querySelectorAll('[id^="message-content-"]'));
   const filtered = candidates.filter(el => !el.closest('[class*="repliedMessage"]'));
-  return filtered.pop() || candidates.pop() || null; // last biasanya konten utama
+  return filtered.pop() || candidates.pop() || null;
 }
 
 function getUsernameEl(messageEl) {
-  // 1) Via aria-labelledby → "message-username-XXXX"
   const labelled = (messageEl.getAttribute('aria-labelledby') || '').split(/\s+/);
   const userId = labelled.find(s => s.startsWith('message-username-'));
   if (userId) {
@@ -94,7 +91,6 @@ function getUsernameEl(messageEl) {
       if (name) return name;
     }
   }
-  // 2) Fallback: cari di header h3
   return messageEl.querySelector('h3 [class*="username"]');
 }
 
@@ -114,7 +110,7 @@ function createOptionsPortal(items, onSelect) {
     position: absolute;
     top: 0; left: 0;
     display: none;
-    background: #2b2d31; /* discord dark bg */
+    background: #2b2d31;
     border: 1px solid #3b3d43;
     border-radius: 8px;
     min-width: 140px;
@@ -150,7 +146,6 @@ function createOptionsPortal(items, onSelect) {
 function addReplyButtonToMessage(message) {
   if (!message || message.querySelector(".gemini-reply-wrapper")) return;
 
-  // Ambil teks konten utama (fix untuk pesan yang sedang reply)
   const { contentText } = extractMessagePieces(message);
   if (!contentText) return;
 
@@ -166,7 +161,7 @@ function addReplyButtonToMessage(message) {
 
   let latestReply = "";
 
-  // ===== Dropdown (gantikan tombol per-room) =====
+  // ===== Dropdown =====
   const trigger = document.createElement("div");
   trigger.className = "gemini-dropdown-trigger";
   trigger.style.cssText = `
@@ -212,7 +207,7 @@ function addReplyButtonToMessage(message) {
   window.addEventListener("scroll", onScrollResize, true);
   window.addEventListener("resize", onScrollResize);
 
-  // ===== Tombol Generate =====
+  // ===== Tombol Generate (reply) =====
   const genBtn = document.createElement("button");
   genBtn.innerText = "💬 Generate";
   genBtn.className = "gemini-reply-btn";
@@ -272,12 +267,12 @@ function addReplyButtonToMessage(message) {
   row.appendChild(copyBtn);
   wrapper.appendChild(row);
 
-  // ===== Manual caption input section =====
+  // ===== Section: Generate Topic (baru, ganti "Generate Manual") =====
   const manualContainer = document.createElement("div");
   manualContainer.style = "display: flex; gap: 6px; flex-wrap: wrap; align-items: center;";
 
   const captionInput = document.createElement("input");
-  captionInput.placeholder = "Manual caption (ID ➜ EN / fix EN)...";
+  captionInput.placeholder = "Optional hint (topic)...";
   captionInput.style = `
     padding: 2px 4px;
     font-size: 12px;
@@ -303,7 +298,7 @@ function addReplyButtonToMessage(message) {
   });
 
   const manualBtn = document.createElement("button");
-  manualBtn.innerText = "💬 Generate Manual";
+  manualBtn.innerText = "💭 Generate Topic";
   manualBtn.style = `
     background: #333;
     color: white;
@@ -314,26 +309,32 @@ function addReplyButtonToMessage(message) {
     font-size: 12px;
   `;
 
+  // >>> perubahan di sini: panggil /generate-topic dan kirim 10 pesan contoh
   manualBtn.onclick = async () => {
-    const manualCaption = captionInput.value.trim();
-    const roomId = roomSelect.value;
-
-    if (!manualCaption) return alert("Masukkan caption manual terlebih dahulu!");
+    const hint = captionInput.value.trim();          // opsional
+    const roomId = roomSelect.value || trigger.dataset.value;
 
     setBtnLoading(manualBtn, true);
     try {
-      const komentar = await getNearbyReplies(message);
-      const res = await fetch("http://localhost:3000/generate-discord", {
+      const nearby = await getNearbyReplies(message);
+      const examples = nearby.slice(0, 10);          // ambil 10 pesan sebagai contoh
+
+      const res = await fetch("http://localhost:3000/generate-topic", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caption: manualCaption, roomId, komentar }),
+        body: JSON.stringify({ roomId, hint, examples }),
       });
 
       const data = await res.json();
-      latestReply = data.reply || "Gagal generate 😅";
+      // support {topics: []} atau {topic: "…"} atau {text: "…"}
+      const out =
+        Array.isArray(data.topics) ? data.topics.join("\n")
+        : (data.topic || data.text || "");
+
+      latestReply = out || "Gagal generate 😅";
 
       await copyToClipboard(latestReply);
-      showMiniToast(manualBtn, "Generated ✓ copied");
+      showMiniToast(manualBtn, "Topic ✓ copied");
       setBtnLoading(manualBtn, false, "✅ Done!");
     } catch (err) {
       console.error("❌ Error:", err);
@@ -342,7 +343,7 @@ function addReplyButtonToMessage(message) {
     }
   };
 
-  // Tombol translate & parafrase
+  // Tombol translate & parafrase (tetap)
   const translateBtn = document.createElement("button");
   translateBtn.innerText = "🌐 ke English";
   translateBtn.title = "Translate dari Indonesia ➜ English";
@@ -416,7 +417,6 @@ function addReplyButtonToMessage(message) {
 
   message.appendChild(wrapper);
 
-  // Cleanup menu jika message keluar dari DOM
   const cleanupObserver = new MutationObserver(() => {
     if (!document.body.contains(wrapper)) {
       menu.remove();
@@ -538,7 +538,6 @@ function injectComposerToolbar() {
       });
       const data = await res.json();
       const out = (data && data.text || "").trim();
-      if (!out) throw new Error("Empty result");
       await copyToClipboard(out);
       showMiniToast(btnParaphrase, "Polished ✓ copied");
       setBtnBusy(btnParaphrase, false, "✅");
