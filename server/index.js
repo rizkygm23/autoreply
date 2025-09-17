@@ -392,6 +392,7 @@ Now output exactly ONE short message (2–8 words), no commas.
     return res.json({ topic: line });
   } catch (err) {
     spinner.stop(false, `${COLORS.red}error${COLORS.reset}`);
+    
     logErr(`${COLORS.cyan}${req._id}${COLORS.reset} Error (/generate-topic): ${err?.message || err}`);
     return res.status(500).json({ error: "Failed to generate topic" });
   }

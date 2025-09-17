@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "bun --watch index.js",
+    "start": "bun index.js"
   },
   "keywords": [],
   "author": "",
@@ -14,10 +15,17 @@
     "@google/generative-ai": "^0.24.1",
     "body-parser": "^2.2.0",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.1",
+    "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "multer": "^2.0.2",
-    "openai": "^5.12.0",
+    "openai": "^5.20.3",
     "pdf-parse": "^1.1.1"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
   }
 }

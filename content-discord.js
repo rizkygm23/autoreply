@@ -102,6 +102,22 @@ function extractMessagePieces(messageEl) {
   return { contentEl, usernameEl, contentText, username };
 }
 
+// ===== Global Room Selector (single dropdown di header) =====
+const ROOM_IDS = ["mmt", "cys", "fastTest", "fgo", "rialo"];
+let selectedRoomId = (() => {
+  try { return localStorage.getItem("geminiSelectedRoom") || ROOM_IDS[0]; } catch { return ROOM_IDS[0]; }
+})();
+
+function getSelectedRoomId() {
+  return selectedRoomId || ROOM_IDS[0];
+}
+function setSelectedRoomId(val) {
+  selectedRoomId = val;
+  try { localStorage.setItem("geminiSelectedRoom", val); } catch {}
+  const trigger = document.querySelector(".gemini-room-trigger");
+  if (trigger) trigger.textContent = val;
+}
+
 // ===== Custom dropdown (portal ke <body>) =====
 function createOptionsPortal(items, onSelect) {
   const menu = document.createElement("div");
@@ -140,46 +156,32 @@ function createOptionsPortal(items, onSelect) {
   return menu;
 }
 
-// ====================
-// UI per pesan (rooms)
-// ====================
-function addReplyButtonToMessage(message) {
-  if (!message || message.querySelector(".gemini-reply-wrapper")) return;
+// Inject 1 dropdown ke header server
+function injectServerRoomDropdown() {
+  const header = document.querySelector("header.header_f37cb1");
+  if (!header) return;
 
-  const { contentText } = extractMessagePieces(message);
-  if (!contentText) return;
+  const host = header.querySelector(".headerChildren_f37cb1") || header;
+  if (!host || host.querySelector(".gemini-room-trigger")) return;
 
-  const caption = contentText;
-  const roomIds = ["mmt", "cys", "fastTest", "fgo", "rialo"];
-
-  const wrapper = document.createElement("div");
-  wrapper.className = "gemini-reply-wrapper";
-  wrapper.style = "display: flex; flex-direction: column; gap: 6px; margin-top: 6px;";
-
-  const row = document.createElement("div");
-  row.style = "display: flex; flex-wrap: wrap; gap: 6px; align-items: center; position: relative;";
-
-  let latestReply = "";
-
-  // ===== Dropdown =====
   const trigger = document.createElement("div");
-  trigger.className = "gemini-dropdown-trigger";
+  trigger.className = "gemini-room-trigger";
   trigger.style.cssText = `
-    position: relative;
+    margin-left: 8px;
     background: #1e1f22;
     color: #e7e9ea;
     border: 1px solid #3b3d43;
-    padding: 4px 8px;
+    padding: 2px 8px;
     border-radius: 6px;
     font-size: 12px;
     cursor: pointer;
     user-select: none;
+    line-height: 18px;
   `;
-  trigger.innerText = "Pilih room…";
+  trigger.textContent = getSelectedRoomId();
 
-  const menu = createOptionsPortal(roomIds, (chosen) => {
-    trigger.innerText = chosen;
-    trigger.dataset.value = chosen;
+  const menu = createOptionsPortal(ROOM_IDS, (chosen) => {
+    setSelectedRoomId(chosen);
     hideMenu();
   });
 
@@ -207,6 +209,29 @@ function addReplyButtonToMessage(message) {
   window.addEventListener("scroll", onScrollResize, true);
   window.addEventListener("resize", onScrollResize);
 
+  host.appendChild(trigger);
+}
+
+// ====================
+// UI per pesan (rooms)
+// ====================
+function addReplyButtonToMessage(message) {
+  if (!message || message.querySelector(".gemini-reply-wrapper")) return;
+
+  const { contentText } = extractMessagePieces(message);
+  if (!contentText) return;
+
+  const caption = contentText;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "gemini-reply-wrapper";
+  wrapper.style = "display: flex; flex-direction: column; gap: 6px; margin-top: 6px;";
+
+  const row = document.createElement("div");
+  row.style = "display: flex; flex-wrap: wrap; gap: 6px; align-items: center; position: relative;";
+
+  let latestReply = "";
+
   // ===== Tombol Generate (reply) =====
   const genBtn = document.createElement("button");
   genBtn.innerText = "💬 Generate";
@@ -222,8 +247,8 @@ function addReplyButtonToMessage(message) {
   `;
 
   genBtn.onclick = async () => {
-    const roomId = trigger.dataset.value;
-    if (!roomId) return alert("Pilih room terlebih dahulu.");
+    const roomId = getSelectedRoomId();
+    if (!roomId) return alert("Pilih room terlebih dahulu (di header).");
 
     setBtnLoading(genBtn, true);
     try {
@@ -262,12 +287,11 @@ function addReplyButtonToMessage(message) {
   `;
   copyBtn.onclick = () => { if (latestReply) copyToClipboard(latestReply); };
 
-  row.appendChild(trigger);
   row.appendChild(genBtn);
   row.appendChild(copyBtn);
   wrapper.appendChild(row);
 
-  // ===== Section: Generate Topic (baru, ganti "Generate Manual") =====
+  // ===== Section: Generate Topic (pakai room global) =====
   const manualContainer = document.createElement("div");
   manualContainer.style = "display: flex; gap: 6px; flex-wrap: wrap; align-items: center;";
 
@@ -283,20 +307,6 @@ function addReplyButtonToMessage(message) {
     min-width: 160px;
   `;
 
-  const roomSelect = document.createElement("select");
-  roomSelect.style = `
-    padding: 2px;
-    font-size: 12px;
-    border-radius: 4px;
-    background:#1e1f22; color:#e7e9ea; border:1px solid #3b3d43;
-  `;
-  ["mmt","cys","fastTest","fgo","rialo"].forEach((roomId) => {
-    const option = document.createElement("option");
-    option.value = roomId;
-    option.text = roomId;
-    roomSelect.appendChild(option);
-  });
-
   const manualBtn = document.createElement("button");
   manualBtn.innerText = "💭 Generate Topic";
   manualBtn.style = `
@@ -309,15 +319,15 @@ function addReplyButtonToMessage(message) {
     font-size: 12px;
   `;
 
-  // >>> perubahan di sini: panggil /generate-topic dan kirim 10 pesan contoh
   manualBtn.onclick = async () => {
-    const hint = captionInput.value.trim();          // opsional
-    const roomId = roomSelect.value || trigger.dataset.value;
+    const hint = captionInput.value.trim();
+    const roomId = getSelectedRoomId();
+    if (!roomId) return alert("Pilih room terlebih dahulu (di header).");
 
     setBtnLoading(manualBtn, true);
     try {
       const nearby = await getNearbyReplies(message);
-      const examples = nearby.slice(0, 10);          // ambil 10 pesan sebagai contoh
+      const examples = nearby.slice(0, 10);
 
       const res = await fetch("http://localhost:3000/generate-topic", {
         method: "POST",
@@ -326,11 +336,9 @@ function addReplyButtonToMessage(message) {
       });
 
       const data = await res.json();
-      // support {topics: []} atau {topic: "…"} atau {text: "…"}
       const out =
         Array.isArray(data.topics) ? data.topics.join("\n")
         : (data.topic || data.text || "");
-
       latestReply = out || "Gagal generate 😅";
 
       await copyToClipboard(latestReply);
@@ -409,23 +417,12 @@ function addReplyButtonToMessage(message) {
   };
 
   manualContainer.appendChild(captionInput);
-  manualContainer.appendChild(roomSelect);
   manualContainer.appendChild(manualBtn);
   manualContainer.appendChild(translateBtn);
   manualContainer.appendChild(paraphraseBtn);
   wrapper.appendChild(manualContainer);
 
   message.appendChild(wrapper);
-
-  const cleanupObserver = new MutationObserver(() => {
-    if (!document.body.contains(wrapper)) {
-      menu.remove();
-      window.removeEventListener("scroll", onScrollResize, true);
-      window.removeEventListener("resize", onScrollResize);
-      cleanupObserver.disconnect();
-    }
-  });
-  cleanupObserver.observe(document.body, { childList: true, subtree: true });
 }
 
 // =====================================
@@ -570,7 +567,14 @@ const composerObserver = new MutationObserver(() => {
 });
 composerObserver.observe(document.body, { childList: true, subtree: true });
 
+// Observer untuk inject dropdown di header (satu kali per halaman)
+const headerObserver = new MutationObserver(() => {
+  try { injectServerRoomDropdown(); } catch (_) {}
+});
+headerObserver.observe(document.body, { childList: true, subtree: true });
+
 setTimeout(() => {
   document.querySelectorAll('[id^="chat-messages-"] > div').forEach(addReplyButtonToMessage);
   injectComposerToolbar();
+  injectServerRoomDropdown();
 }, 800);
