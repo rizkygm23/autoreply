@@ -1,7 +1,7 @@
 // content.js
 
 // === Data room (inisialisasi di atas sesuai permintaan)
-const ROOMS = ["rialo", "mmt", "cys", "fastTest", "fgo"];
+const ROOMS = ["rialo","lighter", "mmt", "cys", "mega", "fgo"];
 
 // Ambil komentar dari tweet lain (maks 20)
 async function getTweetReplies(currentTweet) {

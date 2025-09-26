@@ -103,7 +103,7 @@ function extractMessagePieces(messageEl) {
 }
 
 // ===== Global Room Selector (single dropdown di header) =====
-const ROOM_IDS = ["mmt", "cys", "fastTest", "fgo", "rialo"];
+const ROOM_IDS = ["mmt", "cys","mega", "fgo", "rialo", "lighter"];
 let selectedRoomId = (() => {
   try { return localStorage.getItem("geminiSelectedRoom") || ROOM_IDS[0]; } catch { return ROOM_IDS[0]; }
 })();
