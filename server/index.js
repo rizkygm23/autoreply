@@ -111,6 +111,36 @@ function saveEntryToJSON(jsonPath, newEntry) {
   fs.writeFileSync(jsonPath, JSON.stringify(existing, null, 2), "utf-8");
 }
 
+// ============== Token Estimation Functions ==============
+
+// === Token Estimation ===
+function estimateTokens(text) {
+  if (!text) return 0;
+  // Estimasi kasar: 1 token ≈ 4 karakter untuk bahasa Indonesia/Inggris
+  return Math.ceil(text.length / 4);
+}
+
+function estimateRequestTokens(prompt, roomData, userRoom) {
+  let totalTokens = 0;
+  
+  // Prompt tokens
+  totalTokens += estimateTokens(prompt);
+  
+  // Room data tokens (jika ada)
+  if (roomData && typeof roomData === 'object') {
+    const roomDataText = JSON.stringify(roomData);
+    totalTokens += estimateTokens(roomDataText);
+  }
+  
+  // User room tokens
+  if (userRoom && Array.isArray(userRoom)) {
+    const userRoomText = userRoom.join(' ');
+    totalTokens += estimateTokens(userRoomText);
+  }
+  
+  return totalTokens;
+}
+
 // ============== Supabase Database Functions ==============
 
 // === User Management ===
@@ -280,16 +310,19 @@ async function addUserTokens(userId, tokensToAdd) {
 // === Token Usage Logging ===
 async function logTokenUsage(userId, tokenUsage, aiResponse, endpoint, roomId, requestData, responseData, processingTime) {
   try {
+    // Fixed token usage per request
+    const actualTokens = 4000;
+    
     const { data, error } = await supabase
       .from('token_ai_usage')
       .insert({
         user_id: userId,
-        token_usage: tokenUsage,
+        token_usage: actualTokens,
         ai_response: aiResponse,
         status_request: 'success',
         endpoint: endpoint,
         room_id: roomId,
-        request_data: requestData,
+        request_data: { ...requestData, fixedTokens: actualTokens },
         response_data: responseData,
         processing_time_ms: processingTime,
         ip_address: req?.ip || null,
@@ -649,15 +682,17 @@ app.post("/generate", async (req, res) => {
     return res.status(404).json({ error: "User not found" });
   }
 
-  const requiredTokens = 100; // Cost per AI request
+  // Fixed token cost per request
+  const requiredTokens = 4000; // Fixed cost per AI request
+  
   const hasEnoughTokens = await checkUserTokens(userId, requiredTokens);
   if (!hasEnoughTokens) {
-    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Insufficient tokens for user: ${userId}`);
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Insufficient tokens for user: ${userId} (needs ${requiredTokens}, has ${user.user_token})`);
     return res.status(402).json({ 
       error: "Insufficient tokens", 
       currentTokens: user.user_token,
       requiredTokens: requiredTokens,
-      message: "Please top up your account to continue using AI features"
+      message: `You need ${requiredTokens} tokens for this request. Please top up your account.`
     });
   }
 
@@ -788,15 +823,17 @@ app.post("/generate-discord", async (req, res) => {
     return res.status(404).json({ error: "User not found" });
   }
 
-  const requiredTokens = 100; // Cost per AI request
+  // Fixed token cost per request
+  const requiredTokens = 4000; // Fixed cost per AI request
+  
   const hasEnoughTokens = await checkUserTokens(userId, requiredTokens);
   if (!hasEnoughTokens) {
-    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Insufficient tokens for user: ${userId}`);
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Insufficient tokens for user: ${userId} (needs ${requiredTokens}, has ${user.user_token})`);
     return res.status(402).json({ 
       error: "Insufficient tokens", 
       currentTokens: user.user_token,
       requiredTokens: requiredTokens,
-      message: "Please top up your account to continue using AI features"
+      message: `You need ${requiredTokens} tokens for this request. Please top up your account.`
     });
   }
   let tambahan = "";
@@ -1087,15 +1124,17 @@ app.post("/generate-quick", async (req, res) => {
     return res.status(404).json({ error: "User not found" });
   }
 
-  const requiredTokens = 50; // Lower cost for quick generate
+  // Fixed token cost per request
+  const requiredTokens = 4000; // Fixed cost per AI request
+  
   const hasEnoughTokens = await checkUserTokens(userId, requiredTokens);
   if (!hasEnoughTokens) {
-    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Insufficient tokens for user: ${userId}`);
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Insufficient tokens for user: ${userId} (needs ${requiredTokens}, has ${user.user_token})`);
     return res.status(402).json({ 
       error: "Insufficient tokens", 
       currentTokens: user.user_token,
       requiredTokens: requiredTokens,
-      message: "Please top up your account to continue using AI features"
+      message: `You need ${requiredTokens} tokens for this request. Please top up your account.`
     });
   }
 

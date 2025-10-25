@@ -2,9 +2,14 @@
 
 // Initialize popup when DOM is loaded
 document.addEventListener('DOMContentLoaded', async () => {
+  console.log('🚀 Popup DOM loaded, initializing...');
   await loadAnalytics();
   await checkAuthStatus();
-  setupEventListeners();
+  
+  // Wait a bit for DOM to be fully ready
+  setTimeout(() => {
+    setupEventListeners();
+  }, 100);
 });
 
 // Load analytics data and display stats
@@ -213,26 +218,55 @@ function showNotification(message, type = 'info') {
 
 // Setup event listeners
 function setupEventListeners() {
-  // Login button
-  document.getElementById('loginBtn').addEventListener('click', handleLogin);
+  console.log('🔧 Setting up event listeners...');
   
-  // Register button
-  document.getElementById('registerBtn').addEventListener('click', handleRegister);
+  // Check if elements exist before adding listeners
+  const loginBtn = document.getElementById('loginBtn');
+  const registerBtn = document.getElementById('registerBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const topUpBtn = document.getElementById('topUpBtn');
+  const passwordInput = document.getElementById('passwordInput');
   
-  // Logout button
-  document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+  if (loginBtn) {
+    console.log('✅ Adding login button listener');
+    loginBtn.addEventListener('click', handleLogin);
+  } else {
+    console.error('❌ Login button not found');
+  }
   
-  // Top up button
-  document.getElementById('topUpBtn').addEventListener('click', () => {
-    showNotification('Top-up feature coming soon! Send USDC to rizkygm23.eth', 'info');
-  });
+  if (registerBtn) {
+    console.log('✅ Adding register button listener');
+    registerBtn.addEventListener('click', handleRegister);
+  } else {
+    console.error('❌ Register button not found');
+  }
   
-  // Enter key for login
-  document.getElementById('passwordInput').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      handleLogin();
-    }
-  });
+  if (logoutBtn) {
+    console.log('✅ Adding logout button listener');
+    logoutBtn.addEventListener('click', handleLogout);
+  } else {
+    console.error('❌ Logout button not found');
+  }
+  
+  if (topUpBtn) {
+    console.log('✅ Adding top-up button listener');
+    topUpBtn.addEventListener('click', () => {
+      showNotification('Top-up feature coming soon! Send USDC to rizkygm23.eth', 'info');
+    });
+  } else {
+    console.error('❌ Top-up button not found');
+  }
+  
+  if (passwordInput) {
+    console.log('✅ Adding password input listener');
+    passwordInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        handleLogin();
+      }
+    });
+  } else {
+    console.error('❌ Password input not found');
+  }
 
   // Settings button
   document.getElementById('openSettings').addEventListener('click', () => {

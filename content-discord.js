@@ -317,12 +317,26 @@ function showSimpleLoginModal() {
     ">
       <div style="text-align: center; margin-bottom: 20px;">
         <h2 style="color: #e7e9ea; margin: 0; font-size: 20px;">🚀 Login to Gemini</h2>
-        <p style="color: #888; margin: 8px 0 0 0; font-size: 14px;">Enter your email to continue</p>
+        <p style="color: #888; margin: 8px 0 0 0; font-size: 14px;">Enter your credentials to continue</p>
       </div>
       
       <div style="margin-bottom: 16px;">
         <label style="display: block; color: #e7e9ea; margin-bottom: 8px; font-size: 14px;">Email Address</label>
         <input type="email" id="simpleEmail" placeholder="your@email.com" style="
+          width: 100%;
+          padding: 12px;
+          border: 1px solid #333;
+          border-radius: 6px;
+          background: #2a2a2a;
+          color: #e7e9ea;
+          font-size: 14px;
+          box-sizing: border-box;
+        ">
+      </div>
+      
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; color: #e7e9ea; margin-bottom: 8px; font-size: 14px;">Password</label>
+        <input type="password" id="simplePassword" placeholder="Enter your password" style="
           width: 100%;
           padding: 12px;
           border: 1px solid #333;
@@ -345,7 +359,21 @@ function showSimpleLoginModal() {
           cursor: pointer;
           font-size: 14px;
           font-weight: 500;
-        ">Login/Register</button>
+        ">🔑 Login</button>
+        <button id="simpleRegister" style="
+          flex: 1;
+          background: #00ba7c;
+          color: white;
+          border: none;
+          padding: 12px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 500;
+        ">📝 Register</button>
+      </div>
+      
+      <div style="display: flex; gap: 12px; margin-bottom: 16px;">
         <button id="simpleCancel" style="
           flex: 1;
           background: #333;
@@ -367,53 +395,40 @@ function showSimpleLoginModal() {
 
   // Event listeners
   modal.querySelector('#simpleCancel').onclick = () => modal.remove();
+  // Login handler
   modal.querySelector('#simpleLogin').onclick = async () => {
     const email = modal.querySelector('#simpleEmail').value.trim();
-    if (!email) {
-      alert('Please enter your email address');
+    const password = modal.querySelector('#simplePassword').value.trim();
+    
+    if (!email || !password) {
+      alert('Please enter both email and password');
       return;
     }
 
     const loginBtn = modal.querySelector('#simpleLogin');
     const originalText = loginBtn.textContent;
-    loginBtn.textContent = 'Processing...';
+    loginBtn.textContent = '⏳ Logging in...';
     loginBtn.disabled = true;
 
     try {
-      // Try to use auth helper if available
-      if (window.geminiAuth) {
-        const result = await window.geminiAuth.register(email);
-        if (result.success) {
-          modal.remove();
-          showNotification('Login successful! Welcome to Gemini Auto Reply!', 'success');
-          return;
-        } else if (result.user) {
-          window.geminiAuth.saveUser(result.user);
-          modal.remove();
-          showNotification('Welcome back!', 'success');
-          return;
-        }
-      }
-      
-      // Fallback: direct API call
-      const response = await fetch('https://autoreply-gt64.onrender.com/auth/register', {
+      const response = await fetch('https://autoreply-gt64.onrender.com/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email, password })
       });
       
       const data = await response.json();
       
       if (response.ok) {
         // Store user data
-        localStorage.setItem('geminiUser', JSON.stringify(data.user));
+        await chrome.storage.local.set({ geminiUser: data.user });
         modal.remove();
         showNotification('Login successful! Welcome to Gemini Auto Reply!', 'success');
-      } else if (data.user) {
-        // User exists, login
-        localStorage.setItem('geminiUser', JSON.stringify(data.user));
-        modal.remove();
-        showNotification('Welcome back!', 'success');
+        
+        // Retry the original action
+        if (originalAction) {
+          originalAction();
+        }
       } else {
         alert(data.error || 'Login failed');
       }
@@ -423,6 +438,67 @@ function showSimpleLoginModal() {
     } finally {
       loginBtn.textContent = originalText;
       loginBtn.disabled = false;
+    }
+  };
+  
+  // Register handler
+  modal.querySelector('#simpleRegister').onclick = async () => {
+    const email = modal.querySelector('#simpleEmail').value.trim();
+    const password = modal.querySelector('#simplePassword').value.trim();
+    
+    if (!email || !password) {
+      alert('Please enter both email and password');
+      return;
+    }
+
+    if (password.length < 6) {
+      alert('Password must be at least 6 characters long');
+      return;
+    }
+
+    const registerBtn = modal.querySelector('#simpleRegister');
+    const originalText = registerBtn.textContent;
+    registerBtn.textContent = '⏳ Registering...';
+    registerBtn.disabled = true;
+
+    try {
+      const response = await fetch('https://autoreply-gt64.onrender.com/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Store user data
+        await chrome.storage.local.set({ geminiUser: data.user });
+        modal.remove();
+        showNotification('Registration successful! Welcome to Gemini Auto Reply!', 'success');
+        
+        // Retry the original action
+        if (originalAction) {
+          originalAction();
+        }
+      } else if (data.user) {
+        // User exists, login instead
+        await chrome.storage.local.set({ geminiUser: data.user });
+        modal.remove();
+        showNotification('User already exists! Logged in successfully.', 'success');
+        
+        // Retry the original action
+        if (originalAction) {
+          originalAction();
+        }
+      } else {
+        alert(data.error || 'Registration failed');
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      alert('Registration failed. Please try again.');
+    } finally {
+      registerBtn.textContent = originalText;
+      registerBtn.disabled = false;
     }
   };
   
