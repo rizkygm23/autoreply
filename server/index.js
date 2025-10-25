@@ -308,7 +308,7 @@ async function addUserTokens(userId, tokensToAdd) {
 }
 
 // === Token Usage Logging ===
-async function logTokenUsage(userId, tokenUsage, aiResponse, endpoint, roomId, requestData, responseData, processingTime) {
+async function logTokenUsage(userId, tokenUsage, aiResponse, endpoint, roomId, requestData, responseData, processingTime, req = null) {
   try {
     // Fixed token usage per request
     const actualTokens = 4000;
@@ -784,7 +784,8 @@ Your reply (1 sentence, natural and simple, short reaction + optional light ques
       roomId, 
       { caption, komentar: komentar.length }, 
       { reply }, 
-      elapsed
+      elapsed,
+      req
     );
 
     spinner.stop(true, `${COLORS.green}ok${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
@@ -944,7 +945,8 @@ ${tambahan}
       roomId, 
       { caption, komentar: komentar.length }, 
       { reply }, 
-      elapsed
+      elapsed,
+      req
     );
 
     spinner.stop(true, `${COLORS.green}ok${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
@@ -1180,7 +1182,8 @@ Your quick reply (1 sentence, natural, NO contractions with 's):
       roomId, 
       { caption }, 
       { reply }, 
-      elapsed
+      elapsed,
+      req
     );
 
     spinner.stop(true, `${COLORS.green}ok${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
