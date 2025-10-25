@@ -1,5 +1,10 @@
 // content.js - Enhanced Auto Reply Extension
 
+// === Load Authentication Helper ===
+const authScript = document.createElement('script');
+authScript.src = chrome.runtime.getURL('auth-helper.js');
+document.head.appendChild(authScript);
+
 // === Enhanced Configuration
 const CONFIG = {
   ROOMS: ["rialo", "lighter", "mmt", "cys", "mega", "fgo", "town"],
@@ -391,21 +396,36 @@ async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = tru
     
     const komentar = await getTweetReplies(tweet);
 
-    const requestData = {
+    // Use authenticated request
+    const { response, data } = await window.geminiAuth.authenticatedRequest("/generate", {
+      method: "POST",
+      body: JSON.stringify({
         caption: tweetText,
         roomId,
         komentar,
-      options: {
-        showPreview: settings.get('showPreview'),
-        maxLength: 280,
-        includeEmojis: true
-      }
-    };
-
-    const data = await apiClient.request("/generate", {
-      method: "POST",
-      body: JSON.stringify(requestData)
+        options: {
+          showPreview: settings.get('showPreview'),
+          maxLength: 280,
+          includeEmojis: true
+        }
+      })
     });
+
+    if (!response.ok) {
+      const errorData = data;
+      if (response.status === 402) {
+        // Insufficient tokens
+        showNotification(`Insufficient tokens! You have ${errorData.currentTokens} tokens, need ${errorData.requiredTokens}. Please top up your account.`, "error");
+        window.geminiAuthUI.showUserInfo();
+        return;
+      } else if (response.status === 404) {
+        showNotification("User not found. Please login again.", "error");
+        window.geminiAuthUI.showAuthModal();
+        return;
+      } else {
+        throw new Error(errorData.error || 'Request failed');
+      }
+    }
 
     const reply = data.reply || "Gagal generate 😅";
     const alternatives = data.alternatives || [];
@@ -415,7 +435,9 @@ async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = tru
       roomId, 
       generationTime,
       replyLength: reply.length,
-      alternativesCount: alternatives.length
+      alternativesCount: alternatives.length,
+      tokensUsed: data.tokensUsed,
+      remainingTokens: data.remainingTokens
     });
 
     if (showPreview && settings.get('showPreview')) {
@@ -427,9 +449,9 @@ async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = tru
     btn.innerText = "✅ Done!";
     btn.style.background = CONFIG.THEME.success;
     
-    // Show success notification
+    // Show success notification with token info
     if (settings.get('notifications')) {
-      showNotification("Reply generated successfully!", "success");
+      showNotification(`Reply generated! Used ${data.tokensUsed} tokens. ${data.remainingTokens} remaining.`, "success");
     }
 
   } catch (error) {
@@ -1171,10 +1193,17 @@ function addReplyButtonToTweet(tweet) {
     genBtn.style.boxShadow = '0 2px 8px rgba(29, 155, 240, 0.3)';
   });
 
-  genBtn.addEventListener("click", (e) => {
+  genBtn.addEventListener("click", async (e) => {
     e.preventDefault();
     e.stopPropagation();
     console.log("[Gemini] Generate button clicked!");
+    
+    // Check authentication
+    if (!window.geminiAuth || !window.geminiAuth.isAuthenticated()) {
+      showNotification("Please login to use AI features", "error");
+      window.geminiAuthUI.showAuthModal();
+      return;
+    }
     
     const roomId = settings.get('selectedRoom') || CONFIG.ROOMS[0];
     if (!roomId) {
@@ -1182,7 +1211,7 @@ function addReplyButtonToTweet(tweet) {
       return;
     }
     analytics.track('generate_button_clicked', { roomId, tweetLength: tweetText.length });
-    handleGenerate({ tweet, tweetText, roomId, btn: genBtn });
+    await handleGenerate({ tweet, tweetText, roomId, btn: genBtn });
   });
 
   // Quick Actions Button

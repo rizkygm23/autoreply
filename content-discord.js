@@ -1,5 +1,10 @@
 // content-discord.js - Enhanced Discord Integration
 
+// === Load Authentication Helper ===
+const authScript = document.createElement('script');
+authScript.src = chrome.runtime.getURL('auth-helper.js');
+document.head.appendChild(authScript);
+
 // === Enhanced Configuration
 const CONFIG = {
   ROOMS: ["mmt", "cys", "mega", "fgo", "rialo", "lighter", "town"],
@@ -692,6 +697,13 @@ function addReplyButtonToMessage(message) {
   });
 
   genBtn.onclick = async () => {
+    // Check authentication
+    if (!window.geminiAuth || !window.geminiAuth.isAuthenticated()) {
+      showNotification("Please login to use AI features", "error");
+      window.geminiAuthUI.showAuthModal();
+      return;
+    }
+
     const roomId = getSelectedRoomId();
     if (!roomId) {
       showNotification("Please select a room first", "error");
@@ -705,10 +717,27 @@ function addReplyButtonToMessage(message) {
       const startTime = Date.now();
       const komentar = await getNearbyReplies(message);
       
-      const data = await apiClient.request("/generate-discord", {
+      // Use authenticated request
+      const { response, data } = await window.geminiAuth.authenticatedRequest("/generate-discord", {
         method: "POST",
         body: JSON.stringify({ caption, roomId, komentar })
       });
+
+      if (!response.ok) {
+        const errorData = data;
+        if (response.status === 402) {
+          // Insufficient tokens
+          showNotification(`Insufficient tokens! You have ${errorData.currentTokens} tokens, need ${errorData.requiredTokens}. Please top up your account.`, "error");
+          window.geminiAuthUI.showUserInfo();
+          return;
+        } else if (response.status === 404) {
+          showNotification("User not found. Please login again.", "error");
+          window.geminiAuthUI.showAuthModal();
+          return;
+        } else {
+          throw new Error(errorData.error || 'Request failed');
+        }
+      }
 
       const generationTime = Date.now() - startTime;
       latestReply = data.reply || "Failed to generate reply 😅";
@@ -719,11 +748,13 @@ function addReplyButtonToMessage(message) {
         roomId, 
         generationTime,
         replyLength: latestReply.length,
-        platform: 'discord'
+        platform: 'discord',
+        tokensUsed: data.tokensUsed,
+        remainingTokens: data.remainingTokens
       });
       
       if (settings.get('notifications')) {
-        showNotification("Reply generated and copied to clipboard!", "success");
+        showNotification(`Reply generated! Used ${data.tokensUsed} tokens. ${data.remainingTokens} remaining.`, "success");
       }
       
       setBtnLoading(genBtn, false, "✅ Done!");

@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
 import OpenAI from "openai";
+import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 
@@ -18,6 +19,11 @@ const openai = new OpenAI({
   apiKey: process.env.XAI_API_KEY,
   baseURL: "https://api.x.ai/v1",
 });
+
+// === Setup Supabase ===
+const supabaseUrl = process.env.SUPABASE_URL || 'https://avtaghpbnasdxmjnahxc.supabase.co';
+const supabaseKey = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF2dGFnaHBibmFzZHhtam5haHhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzA5NzU2ODcsImV4cCI6MjA0NjU1MTY4N30.msS8vrExcOUqW70DDMQ0KumXWMuBRpy7jlaU4wIEuLg';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // === Setup folder data
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -105,6 +111,223 @@ function saveEntryToJSON(jsonPath, newEntry) {
   fs.writeFileSync(jsonPath, JSON.stringify(existing, null, 2), "utf-8");
 }
 
+// ============== Supabase Database Functions ==============
+
+// === User Management ===
+async function createUser(email, roomData = {}) {
+  try {
+    const defaultRooms = ["rialo", "lighter", "mmt", "cys", "mega", "fgo", "town"];
+    const defaultRoomData = {};
+    
+    // Load room data from files
+    for (const room of defaultRooms) {
+      try {
+        const roomFilePath = path.join(DATA_DIR, `${room}.json`);
+        if (fs.existsSync(roomFilePath)) {
+          const roomContent = fs.readFileSync(roomFilePath, 'utf-8');
+          defaultRoomData[room] = JSON.parse(roomContent);
+        }
+      } catch (err) {
+        console.warn(`Failed to load room data for ${room}:`, err.message);
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('user')
+      .insert({
+        user_mail: email,
+        user_room: defaultRooms,
+        user_room_data: { ...defaultRoomData, ...roomData },
+        user_token: 200000 // Free 200k tokens
+      })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505') { // Unique constraint violation
+        throw new Error('User already exists');
+      }
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error creating user:', error);
+    throw error;
+  }
+}
+
+async function getUserByEmail(email) {
+  try {
+    const { data, error } = await supabase
+      .from('user')
+      .select('*')
+      .eq('user_mail', email)
+      .eq('is_active', true)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') { // No rows returned
+        return null;
+      }
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error getting user:', error);
+    throw error;
+  }
+}
+
+async function getUserById(userId) {
+  try {
+    const { data, error } = await supabase
+      .from('user')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error getting user by ID:', error);
+    throw error;
+  }
+}
+
+// === Token Management ===
+async function checkUserTokens(userId, requiredTokens) {
+  try {
+    const { data, error } = await supabase
+      .rpc('check_user_tokens', {
+        p_user_id: userId,
+        p_required_tokens: requiredTokens
+      });
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error checking user tokens:', error);
+    return false;
+  }
+}
+
+async function deductUserTokens(userId, tokensToDeduct) {
+  try {
+    const { data, error } = await supabase
+      .rpc('deduct_user_tokens', {
+        p_user_id: userId,
+        p_tokens_to_deduct: tokensToDeduct
+      });
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error deducting user tokens:', error);
+    return false;
+  }
+}
+
+async function addUserTokens(userId, tokensToAdd) {
+  try {
+    const { data, error } = await supabase
+      .rpc('add_user_tokens', {
+        p_user_id: userId,
+        p_tokens_to_add: tokensToAdd
+      });
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error adding user tokens:', error);
+    return false;
+  }
+}
+
+// === Token Usage Logging ===
+async function logTokenUsage(userId, tokenUsage, aiResponse, endpoint, roomId, requestData, responseData, processingTime) {
+  try {
+    const { data, error } = await supabase
+      .from('token_ai_usage')
+      .insert({
+        user_id: userId,
+        token_usage: tokenUsage,
+        ai_response: aiResponse,
+        status_request: 'success',
+        endpoint: endpoint,
+        room_id: roomId,
+        request_data: requestData,
+        response_data: responseData,
+        processing_time_ms: processingTime,
+        ip_address: req?.ip || null,
+        user_agent: req?.get('User-Agent') || null
+      });
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error logging token usage:', error);
+    // Don't throw error here as it shouldn't break the main flow
+  }
+}
+
+// === Payment Management ===
+async function createPayment(userId, txHash, dollarValue, tokenValue) {
+  try {
+    const { data, error } = await supabase
+      .from('payment')
+      .insert({
+        user_id: userId,
+        arbitrum_txhash: txHash,
+        valueDollar: dollarValue,
+        valueToken: tokenValue,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating payment:', error);
+    throw error;
+  }
+}
+
+async function confirmPayment(txHash) {
+  try {
+    const { data, error } = await supabase
+      .from('payment')
+      .update({
+        status: 'confirmed',
+        confirmed_at: new Date().toISOString()
+      })
+      .eq('arbitrum_txhash', txHash)
+      .select()
+      .single();
+
+    if (error) throw error;
+    
+    // Add tokens to user
+    if (data) {
+      await addUserTokens(data.user_id, data.valueToken);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error confirming payment:', error);
+    throw error;
+  }
+}
+
 // ============== OpenAI wrapper ==============
 async function generateReplyFromGrok(prompt) {
   const completion = await openai.chat.completions.create({
@@ -174,12 +397,243 @@ app.use((req, _res, next) => {
   next();
 });
 
+// ============== Authentication Endpoints ==============
+
+// === Register User ===
+app.post("/auth/register", async (req, res) => {
+  const { email } = req.body;
+  
+  if (!email) {
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing email on /auth/register`);
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  const spinner = startSpinner(`${req._id} /auth/register`, "Creating user");
+  try {
+    // Check if user already exists
+    const existingUser = await getUserByEmail(email);
+    if (existingUser) {
+      spinner.stop(false, `${COLORS.yellow}user exists${COLORS.reset}`);
+      return res.status(409).json({ 
+        error: "User already exists",
+        user: {
+          user_id: existingUser.user_id,
+          user_mail: existingUser.user_mail,
+          user_token: existingUser.user_token,
+          user_room: existingUser.user_room
+        }
+      });
+    }
+
+    // Create new user
+    const newUser = await createUser(email);
+    
+    spinner.stop(true, `${COLORS.green}created${COLORS.reset}`);
+    logOk(`${COLORS.cyan}${req._id}${COLORS.reset} New user created: ${COLORS.gray}${email}${COLORS.reset}`);
+    
+    res.json({
+      success: true,
+      user: {
+        user_id: newUser.user_id,
+        user_mail: newUser.user_mail,
+        user_token: newUser.user_token,
+        user_room: newUser.user_room,
+        user_room_data: newUser.user_room_data
+      }
+    });
+  } catch (error) {
+    const elapsed = Date.now() - req._t0;
+    spinner.stop(false, `${COLORS.red}error${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
+    logErr(`${COLORS.cyan}${req._id}${COLORS.reset} Error (Register): ${error.message}`);
+    res.status(500).json({ error: "Failed to create user" });
+  }
+});
+
+// === Login User ===
+app.post("/auth/login", async (req, res) => {
+  const { email } = req.body;
+  
+  if (!email) {
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing email on /auth/login`);
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  const spinner = startSpinner(`${req._id} /auth/login`, "Authenticating");
+  try {
+    const user = await getUserByEmail(email);
+    
+    if (!user) {
+      spinner.stop(false, `${COLORS.red}not found${COLORS.reset}`);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    spinner.stop(true, `${COLORS.green}success${COLORS.reset}`);
+    logOk(`${COLORS.cyan}${req._id}${COLORS.reset} User login: ${COLORS.gray}${email}${COLORS.reset}`);
+    
+    res.json({
+      success: true,
+      user: {
+        user_id: user.user_id,
+        user_mail: user.user_mail,
+        user_token: user.user_token,
+        user_room: user.user_room,
+        user_room_data: user.user_room_data
+      }
+    });
+  } catch (error) {
+    const elapsed = Date.now() - req._t0;
+    spinner.stop(false, `${COLORS.red}error${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
+    logErr(`${COLORS.cyan}${req._id}${COLORS.reset} Error (Login): ${error.message}`);
+    res.status(500).json({ error: "Failed to authenticate user" });
+  }
+});
+
+// === Get User Info ===
+app.get("/auth/user/:userId", async (req, res) => {
+  const { userId } = req.params;
+  
+  if (!userId) {
+    return res.status(400).json({ error: "User ID is required" });
+  }
+
+  const spinner = startSpinner(`${req._id} /auth/user`, "Fetching user");
+  try {
+    const user = await getUserById(parseInt(userId));
+    
+    if (!user) {
+      spinner.stop(false, `${COLORS.red}not found${COLORS.reset}`);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    spinner.stop(true, `${COLORS.green}success${COLORS.reset}`);
+    
+    res.json({
+      success: true,
+      user: {
+        user_id: user.user_id,
+        user_mail: user.user_mail,
+        user_token: user.user_token,
+        user_room: user.user_room,
+        user_room_data: user.user_room_data,
+        created_at: user.created_at
+      }
+    });
+  } catch (error) {
+    const elapsed = Date.now() - req._t0;
+    spinner.stop(false, `${COLORS.red}error${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
+    logErr(`${COLORS.cyan}${req._id}${COLORS.reset} Error (Get User): ${error.message}`);
+    res.status(500).json({ error: "Failed to fetch user" });
+  }
+});
+
+// === Payment Endpoints ===
+app.post("/payment/create", async (req, res) => {
+  const { userId, txHash, dollarValue, tokenValue } = req.body;
+  
+  if (!userId || !txHash || !dollarValue || !tokenValue) {
+    return res.status(400).json({ error: "All payment fields are required" });
+  }
+
+  if (dollarValue < 5) {
+    return res.status(400).json({ error: "Minimum payment is $5" });
+  }
+
+  const spinner = startSpinner(`${req._id} /payment/create`, "Creating payment");
+  try {
+    const payment = await createPayment(userId, txHash, dollarValue, tokenValue);
+    
+    spinner.stop(true, `${COLORS.green}created${COLORS.reset}`);
+    logOk(`${COLORS.cyan}${req._id}${COLORS.reset} Payment created: ${COLORS.gray}${txHash}${COLORS.reset}`);
+    
+    res.json({
+      success: true,
+      payment: {
+        id: payment.id,
+        arbitrum_txhash: payment.arbitrum_txhash,
+        valueDollar: payment.valueDollar,
+        valueToken: payment.valueToken,
+        status: payment.status
+      }
+    });
+  } catch (error) {
+    const elapsed = Date.now() - req._t0;
+    spinner.stop(false, `${COLORS.red}error${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
+    logErr(`${COLORS.cyan}${req._id}${COLORS.reset} Error (Create Payment): ${error.message}`);
+    res.status(500).json({ error: "Failed to create payment" });
+  }
+});
+
+app.post("/payment/confirm", async (req, res) => {
+  const { txHash } = req.body;
+  
+  if (!txHash) {
+    return res.status(400).json({ error: "Transaction hash is required" });
+  }
+
+  const spinner = startSpinner(`${req._id} /payment/confirm`, "Confirming payment");
+  try {
+    const payment = await confirmPayment(txHash);
+    
+    if (!payment) {
+      spinner.stop(false, `${COLORS.red}not found${COLORS.reset}`);
+      return res.status(404).json({ error: "Payment not found" });
+    }
+    
+    spinner.stop(true, `${COLORS.green}confirmed${COLORS.reset}`);
+    logOk(`${COLORS.cyan}${req._id}${COLORS.reset} Payment confirmed: ${COLORS.gray}${txHash}${COLORS.reset}`);
+    
+    res.json({
+      success: true,
+      payment: {
+        id: payment.id,
+        arbitrum_txhash: payment.arbitrum_txhash,
+        valueDollar: payment.valueDollar,
+        valueToken: payment.valueToken,
+        status: payment.status,
+        confirmed_at: payment.confirmed_at
+      }
+    });
+  } catch (error) {
+    const elapsed = Date.now() - req._t0;
+    spinner.stop(false, `${COLORS.red}error${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
+    logErr(`${COLORS.cyan}${req._id}${COLORS.reset} Error (Confirm Payment): ${error.message}`);
+    res.status(500).json({ error: "Failed to confirm payment" });
+  }
+});
+
+// ============== Enhanced AI Endpoints with Authentication ==============
+
 // === Endpoint Twitter/X
 app.post("/generate", async (req, res) => {
-  const { caption, roomId, komentar = [] } = req.body;
+  const { caption, roomId, komentar = [], userId } = req.body;
+  
   if (!caption || !roomId) {
     logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing caption/roomId on /generate`);
     return res.status(400).json({ error: "caption and roomId are required" });
+  }
+
+  if (!userId) {
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing userId on /generate`);
+    return res.status(400).json({ error: "userId is required for authentication" });
+  }
+
+  // Check if user exists and has enough tokens
+  const user = await getUserById(userId);
+  if (!user) {
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} User not found: ${userId}`);
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const requiredTokens = 100; // Cost per AI request
+  const hasEnoughTokens = await checkUserTokens(userId, requiredTokens);
+  if (!hasEnoughTokens) {
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Insufficient tokens for user: ${userId}`);
+    return res.status(402).json({ 
+      error: "Insufficient tokens", 
+      currentTokens: user.user_token,
+      requiredTokens: requiredTokens,
+      message: "Please top up your account to continue using AI features"
+    });
   }
 
   const jsonPath = path.join(DATA_DIR, `${roomId}.json`);
@@ -244,6 +698,7 @@ Your reply (1 sentence, natural and simple, short reaction + optional light ques
 
   const spinner = startSpinner(`${req._id} /generate`, "AI thinking");
   try {
+    const startTime = Date.now();
     const rawReply = await generateReplyFromGrok(prompt);
     const reply = removeContractions(rawReply);
     const elapsed = Date.now() - req._t0;
@@ -253,9 +708,32 @@ Your reply (1 sentence, natural and simple, short reaction + optional light ques
       return res.status(500).json({ error: "Reply not valid" });
     }
 
+    // Deduct tokens from user
+    const tokenDeductionSuccess = await deductUserTokens(userId, requiredTokens);
+    if (!tokenDeductionSuccess) {
+      spinner.stop(false, `${COLORS.red}token deduction failed${COLORS.reset}`);
+      return res.status(500).json({ error: "Failed to deduct tokens" });
+    }
+
+    // Log token usage
+    await logTokenUsage(
+      userId, 
+      requiredTokens, 
+      reply, 
+      '/generate', 
+      roomId, 
+      { caption, komentar: komentar.length }, 
+      { reply }, 
+      elapsed
+    );
+
     spinner.stop(true, `${COLORS.green}ok${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
-    logOk(`${COLORS.cyan}${req._id}${COLORS.reset} X reply: ${COLORS.gray}"${reply.trim()}"${COLORS.reset}`);
-    res.json({ reply });
+    logOk(`${COLORS.cyan}${req._id}${COLORS.reset} X reply: ${COLORS.gray}"${reply.trim()}"${COLORS.reset} | Tokens: ${user.user_token - requiredTokens}`);
+    res.json({ 
+      reply,
+      tokensUsed: requiredTokens,
+      remainingTokens: user.user_token - requiredTokens
+    });
   } catch (err) {
     const elapsed = Date.now() - req._t0;
     spinner.stop(false, `${COLORS.red}error${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
@@ -266,10 +744,35 @@ Your reply (1 sentence, natural and simple, short reaction + optional light ques
 
 // === Endpoint Discord
 app.post("/generate-discord", async (req, res) => {
-  const { caption, roomId, komentar = [] } = req.body;
+  const { caption, roomId, komentar = [], userId } = req.body;
+  
   if (!caption || !roomId) {
     logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing caption/roomId on /generate-discord`);
     return res.status(400).json({ error: "caption and roomId are required" });
+  }
+
+  if (!userId) {
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing userId on /generate-discord`);
+    return res.status(400).json({ error: "userId is required for authentication" });
+  }
+
+  // Check if user exists and has enough tokens
+  const user = await getUserById(userId);
+  if (!user) {
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} User not found: ${userId}`);
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const requiredTokens = 100; // Cost per AI request
+  const hasEnoughTokens = await checkUserTokens(userId, requiredTokens);
+  if (!hasEnoughTokens) {
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Insufficient tokens for user: ${userId}`);
+    return res.status(402).json({ 
+      error: "Insufficient tokens", 
+      currentTokens: user.user_token,
+      requiredTokens: requiredTokens,
+      message: "Please top up your account to continue using AI features"
+    });
   }
   let tambahan = "";
   let kodeEmoji = [];
@@ -353,6 +856,7 @@ ${tambahan}
 
   const spinner = startSpinner(`${req._id} /generate-discord`, "AI thinking");
   try {
+    const startTime = Date.now();
     const rawReply = await generateReplyFromGrok(prompt);
     const reply = removeContractions(rawReply);
     const elapsed = Date.now() - req._t0;
@@ -362,9 +866,32 @@ ${tambahan}
       return res.status(500).json({ error: "Reply not valid" });
     }
 
+    // Deduct tokens from user
+    const tokenDeductionSuccess = await deductUserTokens(userId, requiredTokens);
+    if (!tokenDeductionSuccess) {
+      spinner.stop(false, `${COLORS.red}token deduction failed${COLORS.reset}`);
+      return res.status(500).json({ error: "Failed to deduct tokens" });
+    }
+
+    // Log token usage
+    await logTokenUsage(
+      userId, 
+      requiredTokens, 
+      reply, 
+      '/generate-discord', 
+      roomId, 
+      { caption, komentar: komentar.length }, 
+      { reply }, 
+      elapsed
+    );
+
     spinner.stop(true, `${COLORS.green}ok${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
-    logOk(`${COLORS.cyan}${req._id}${COLORS.reset} Discord reply: ${COLORS.gray}"${reply.trim()}"${COLORS.reset}`);
-    res.json({ reply });
+    logOk(`${COLORS.cyan}${req._id}${COLORS.reset} Discord reply: ${COLORS.gray}"${reply.trim()}"${COLORS.reset} | Tokens: ${user.user_token - requiredTokens}`);
+    res.json({ 
+      reply,
+      tokensUsed: requiredTokens,
+      remainingTokens: user.user_token - requiredTokens
+    });
   } catch (err) {
     const elapsed = Date.now() - req._t0;
     spinner.stop(false, `${COLORS.red}error${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
@@ -516,10 +1043,35 @@ Rewritten:
 
 // === Quick Generate (Twitter/X)
 app.post("/generate-quick", async (req, res) => {
-  const { caption, roomId } = req.body;
+  const { caption, roomId, userId } = req.body;
+  
   if (!caption || !roomId) {
     logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing caption/roomId on /generate-quick`);
     return res.status(400).json({ error: "caption and roomId are required" });
+  }
+
+  if (!userId) {
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing userId on /generate-quick`);
+    return res.status(400).json({ error: "userId is required for authentication" });
+  }
+
+  // Check if user exists and has enough tokens
+  const user = await getUserById(userId);
+  if (!user) {
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} User not found: ${userId}`);
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const requiredTokens = 50; // Lower cost for quick generate
+  const hasEnoughTokens = await checkUserTokens(userId, requiredTokens);
+  if (!hasEnoughTokens) {
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Insufficient tokens for user: ${userId}`);
+    return res.status(402).json({ 
+      error: "Insufficient tokens", 
+      currentTokens: user.user_token,
+      requiredTokens: requiredTokens,
+      message: "Please top up your account to continue using AI features"
+    });
   }
 
   const spinner = startSpinner(`${req._id} /generate-quick`, "AI thinking");
@@ -538,6 +1090,7 @@ Tweet: "${sanitizeText(caption)}"
 Your quick reply (1 sentence, natural, NO contractions with 's):
 `.trim();
 
+    const startTime = Date.now();
     const rawReply = await generateReplyFromGrok(prompt);
     const reply = removeContractions(rawReply);
     const elapsed = Date.now() - req._t0;
@@ -547,9 +1100,32 @@ Your quick reply (1 sentence, natural, NO contractions with 's):
       return res.status(500).json({ error: "Reply not valid" });
     }
 
+    // Deduct tokens from user
+    const tokenDeductionSuccess = await deductUserTokens(userId, requiredTokens);
+    if (!tokenDeductionSuccess) {
+      spinner.stop(false, `${COLORS.red}token deduction failed${COLORS.reset}`);
+      return res.status(500).json({ error: "Failed to deduct tokens" });
+    }
+
+    // Log token usage
+    await logTokenUsage(
+      userId, 
+      requiredTokens, 
+      reply, 
+      '/generate-quick', 
+      roomId, 
+      { caption }, 
+      { reply }, 
+      elapsed
+    );
+
     spinner.stop(true, `${COLORS.green}ok${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
-    logOk(`${COLORS.cyan}${req._id}${COLORS.reset} Quick reply: ${COLORS.gray}"${reply.trim()}"${COLORS.reset}`);
-    res.json({ reply });
+    logOk(`${COLORS.cyan}${req._id}${COLORS.reset} Quick reply: ${COLORS.gray}"${reply.trim()}"${COLORS.reset} | Tokens: ${user.user_token - requiredTokens}`);
+    res.json({ 
+      reply,
+      tokensUsed: requiredTokens,
+      remainingTokens: user.user_token - requiredTokens
+    });
   } catch (err) {
     const elapsed = Date.now() - req._t0;
     spinner.stop(false, `${COLORS.red}error${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
