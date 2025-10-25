@@ -114,7 +114,7 @@ function saveEntryToJSON(jsonPath, newEntry) {
 // ============== Supabase Database Functions ==============
 
 // === User Management ===
-async function createUser(email, roomData = {}) {
+async function createUser(email, password, roomData = {}) {
   try {
     const defaultRooms = ["rialo", "lighter", "mmt", "cys", "mega", "fgo", "town"];
     const defaultRoomData = {};
@@ -136,6 +136,7 @@ async function createUser(email, roomData = {}) {
       .from('user')
       .insert({
         user_mail: email,
+        user_password: password, // Store password
         user_room: defaultRooms,
         user_room_data: { ...defaultRoomData, ...roomData },
         user_token: 200000 // Free 200k tokens
@@ -176,6 +177,30 @@ async function getUserByEmail(email) {
     return data;
   } catch (error) {
     console.error('Error getting user:', error);
+    throw error;
+  }
+}
+
+async function authenticateUser(email, password) {
+  try {
+    const { data, error } = await supabase
+      .from('user')
+      .select('*')
+      .eq('user_mail', email)
+      .eq('user_password', password)
+      .eq('is_active', true)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') { // No rows returned
+        return null;
+      }
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error authenticating user:', error);
     throw error;
   }
 }
@@ -401,11 +426,11 @@ app.use((req, _res, next) => {
 
 // === Register User ===
 app.post("/auth/register", async (req, res) => {
-  const { email } = req.body;
+  const { email, password } = req.body;
   
-  if (!email) {
-    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing email on /auth/register`);
-    return res.status(400).json({ error: "Email is required" });
+  if (!email || !password) {
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing email or password on /auth/register`);
+    return res.status(400).json({ error: "Email and password are required" });
   }
 
   const spinner = startSpinner(`${req._id} /auth/register`, "Creating user");
@@ -426,7 +451,7 @@ app.post("/auth/register", async (req, res) => {
     }
 
     // Create new user
-    const newUser = await createUser(email);
+    const newUser = await createUser(email, password);
     
     spinner.stop(true, `${COLORS.green}created${COLORS.reset}`);
     logOk(`${COLORS.cyan}${req._id}${COLORS.reset} New user created: ${COLORS.gray}${email}${COLORS.reset}`);
@@ -451,20 +476,20 @@ app.post("/auth/register", async (req, res) => {
 
 // === Login User ===
 app.post("/auth/login", async (req, res) => {
-  const { email } = req.body;
+  const { email, password } = req.body;
   
-  if (!email) {
-    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing email on /auth/login`);
-    return res.status(400).json({ error: "Email is required" });
+  if (!email || !password) {
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing email or password on /auth/login`);
+    return res.status(400).json({ error: "Email and password are required" });
   }
 
   const spinner = startSpinner(`${req._id} /auth/login`, "Authenticating");
   try {
-    const user = await getUserByEmail(email);
+    const user = await authenticateUser(email, password);
     
     if (!user) {
-      spinner.stop(false, `${COLORS.red}not found${COLORS.reset}`);
-      return res.status(404).json({ error: "User not found" });
+      spinner.stop(false, `${COLORS.red}invalid credentials${COLORS.reset}`);
+      return res.status(401).json({ error: "Invalid email or password" });
     }
 
     spinner.stop(true, `${COLORS.green}success${COLORS.reset}`);

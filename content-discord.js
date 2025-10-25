@@ -3,6 +3,12 @@
 // === Load Authentication Helper ===
 const authScript = document.createElement('script');
 authScript.src = chrome.runtime.getURL('auth-helper.js');
+authScript.onload = () => {
+  console.log('[Gemini Discord] Auth helper loaded successfully');
+};
+authScript.onerror = () => {
+  console.error('[Gemini Discord] Failed to load auth helper');
+};
 document.head.appendChild(authScript);
 
 // === Enhanced Configuration
@@ -281,6 +287,158 @@ function copyToClipboard(text) {
 }
 
 // === Enhanced Notification System
+// === Fallback Simple Login Modal for Discord
+function showSimpleLoginModal() {
+  const modal = document.createElement('div');
+  modal.className = 'gemini-simple-login';
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 2147483647;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  `;
+
+  modal.innerHTML = `
+    <div style="
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    ">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="color: #e7e9ea; margin: 0; font-size: 20px;">🚀 Login to Gemini</h2>
+        <p style="color: #888; margin: 8px 0 0 0; font-size: 14px;">Enter your email to continue</p>
+      </div>
+      
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; color: #e7e9ea; margin-bottom: 8px; font-size: 14px;">Email Address</label>
+        <input type="email" id="simpleEmail" placeholder="your@email.com" style="
+          width: 100%;
+          padding: 12px;
+          border: 1px solid #333;
+          border-radius: 6px;
+          background: #2a2a2a;
+          color: #e7e9ea;
+          font-size: 14px;
+          box-sizing: border-box;
+        ">
+      </div>
+      
+      <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+        <button id="simpleLogin" style="
+          flex: 1;
+          background: #5865F2;
+          color: white;
+          border: none;
+          padding: 12px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 500;
+        ">Login/Register</button>
+        <button id="simpleCancel" style="
+          flex: 1;
+          background: #333;
+          color: #e7e9ea;
+          border: none;
+          padding: 12px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+        ">Cancel</button>
+      </div>
+      
+      <div style="text-align: center; color: #888; font-size: 12px;">
+        <p>New users get 200,000 free tokens!</p>
+        <p>Each AI request costs 100 tokens</p>
+      </div>
+    </div>
+  `;
+
+  // Event listeners
+  modal.querySelector('#simpleCancel').onclick = () => modal.remove();
+  modal.querySelector('#simpleLogin').onclick = async () => {
+    const email = modal.querySelector('#simpleEmail').value.trim();
+    if (!email) {
+      alert('Please enter your email address');
+      return;
+    }
+
+    const loginBtn = modal.querySelector('#simpleLogin');
+    const originalText = loginBtn.textContent;
+    loginBtn.textContent = 'Processing...';
+    loginBtn.disabled = true;
+
+    try {
+      // Try to use auth helper if available
+      if (window.geminiAuth) {
+        const result = await window.geminiAuth.register(email);
+        if (result.success) {
+          modal.remove();
+          showNotification('Login successful! Welcome to Gemini Auto Reply!', 'success');
+          return;
+        } else if (result.user) {
+          window.geminiAuth.saveUser(result.user);
+          modal.remove();
+          showNotification('Welcome back!', 'success');
+          return;
+        }
+      }
+      
+      // Fallback: direct API call
+      const response = await fetch('https://autoreply-gt64.onrender.com/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Store user data
+        localStorage.setItem('geminiUser', JSON.stringify(data.user));
+        modal.remove();
+        showNotification('Login successful! Welcome to Gemini Auto Reply!', 'success');
+      } else if (data.user) {
+        // User exists, login
+        localStorage.setItem('geminiUser', JSON.stringify(data.user));
+        modal.remove();
+        showNotification('Welcome back!', 'success');
+      } else {
+        alert(data.error || 'Login failed');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('Login failed. Please try again.');
+    } finally {
+      loginBtn.textContent = originalText;
+      loginBtn.disabled = false;
+    }
+  };
+  
+  // Close on outside click
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove();
+  };
+
+  document.body.appendChild(modal);
+  
+  // Focus email input
+  setTimeout(() => {
+    modal.querySelector('#simpleEmail').focus();
+  }, 100);
+}
+
 function showNotification(message, type = 'info') {
   const notification = document.createElement('div');
   notification.style.cssText = `
@@ -698,9 +856,14 @@ function addReplyButtonToMessage(message) {
 
   genBtn.onclick = async () => {
     // Check authentication
-    if (!window.geminiAuth || !window.geminiAuth.isAuthenticated()) {
+    const userData = await chrome.storage.local.get(['geminiUser']);
+    if (!userData.geminiUser) {
       showNotification("Please login to use AI features", "error");
-      window.geminiAuthUI.showAuthModal();
+      if (window.geminiAuthUI) {
+        window.geminiAuthUI.showAuthModal();
+      } else {
+        showSimpleLoginModal();
+      }
       return;
     }
 
@@ -717,11 +880,19 @@ function addReplyButtonToMessage(message) {
       const startTime = Date.now();
       const komentar = await getNearbyReplies(message);
       
-      // Use authenticated request
-      const { response, data } = await window.geminiAuth.authenticatedRequest("/generate-discord", {
+      // Use direct API request with userId
+      const response = await fetch(`${CONFIG.API_BASE_URL}/generate-discord`, {
         method: "POST",
-        body: JSON.stringify({ caption, roomId, komentar })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          caption, 
+          roomId, 
+          komentar,
+          userId: userData.geminiUser.user_id
+        })
       });
+      
+      const data = await response.json();
 
       if (!response.ok) {
         const errorData = data;
@@ -1033,6 +1204,33 @@ function showSettingsPanel() {
     </div>
     
     <div style="display: grid; gap: 16px;">
+      <!-- Authentication -->
+      <div>
+        <h4 style="color: ${CONFIG.THEME.text}; margin: 0 0 8px 0; font-size: 14px;">🔐 Authentication</h4>
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+          <button id="loginBtn" style="
+            background: ${CONFIG.THEME.primary}; 
+            color: white; 
+            border: none; 
+            padding: 6px 12px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 11px;
+            flex: 1;
+          ">🔑 Login/Register</button>
+          <button id="userInfoBtn" style="
+            background: ${CONFIG.THEME.success}; 
+            color: white; 
+            border: none; 
+            padding: 6px 12px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 11px;
+            flex: 1;
+          ">👤 Account</button>
+        </div>
+      </div>
+      
       <div>
         <label style="display: block; color: ${CONFIG.THEME.text}; margin-bottom: 8px; font-weight: 500;">
           <input type="checkbox" id="showPreview" ${settings.get('showPreview') ? 'checked' : ''} style="margin-right: 8px;">
@@ -1123,6 +1321,26 @@ function showSettingsPanel() {
     link.download = `gemini-discord-analytics-${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+  
+  // Authentication buttons
+  document.getElementById('loginBtn').onclick = () => {
+    panel.remove();
+    if (window.geminiAuthUI) {
+      window.geminiAuthUI.showAuthModal();
+    } else {
+      // Fallback: show simple login modal
+      showSimpleLoginModal();
+    }
+  };
+  
+  document.getElementById('userInfoBtn').onclick = () => {
+    panel.remove();
+    if (window.geminiAuthUI) {
+      window.geminiAuthUI.showUserInfo();
+    } else {
+      showNotification("Please login first using the Login/Register button.", "error");
+    }
   };
 
   // Close on outside click
