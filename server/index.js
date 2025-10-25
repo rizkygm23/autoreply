@@ -115,6 +115,52 @@ async function generateReplyFromGrok(prompt) {
   return completion.choices[0].message.content;
 }
 
+// ============== Post-processing to remove contractions ==============
+function removeContractions(text) {
+  if (!text) return text;
+  
+  // Common contractions to replace
+  const contractions = {
+    "what's": "what is",
+    "how's": "how is", 
+    "when's": "when is",
+    "where's": "where is",
+    "who's": "who is",
+    "it's": "it is",
+    "that's": "that is",
+    "here's": "here is",
+    "there's": "there is",
+    "I'm": "I am",
+    "you're": "you are",
+    "we're": "we are",
+    "they're": "they are",
+    "he's": "he is",
+    "she's": "she is",
+    "let's": "let us",
+    "can't": "cannot",
+    "won't": "will not",
+    "don't": "do not",
+    "doesn't": "does not",
+    "didn't": "did not",
+    "hasn't": "has not",
+    "haven't": "have not",
+    "isn't": "is not",
+    "aren't": "are not",
+    "wasn't": "was not",
+    "weren't": "were not"
+  };
+  
+  let result = text;
+  
+  // Replace contractions (case-insensitive)
+  Object.entries(contractions).forEach(([contraction, fullForm]) => {
+    const regex = new RegExp(`\\b${contraction.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+    result = result.replace(regex, fullForm);
+  });
+  
+  return result;
+}
+
 // ============== Pretty Startup Log ==============
 logOk(`Server booting on ${COLORS.bold}http://localhost:${PORT}${COLORS.reset}`);
 logInfo(`Data dir: ${COLORS.gray}${DATA_DIR}${COLORS.reset}`);
@@ -157,7 +203,7 @@ app.post("/generate", async (req, res) => {
     .join("\n\n");
 
   const prompt = `
-You are a friendly user in the "${roomId}" community. Always natural, casual, and short. Never robotic or template.
+You are a friendly user in the "${roomId}" community. Always natural, casual, and conversational. Never robotic or template-like.
 
 Task:
 Write ONE short and authentic reply to the new tweet below.
@@ -165,17 +211,26 @@ Max 1 sentence, no paragraphs.
 Do NOT copy the tweet or history.
 Do NOT use symbols — or -.
 Keep it simple, natural, and human, like a normal person chatting.
-It can be a short reaction ("Nice work!", "Congrats!") OR a short reaction followed by a light, relevant question ("Looks great, when’s the next one?", "Well done, how long did this take?").
+It can be a short reaction ("Nice work!", "Congrats!") OR a short reaction followed by a light, relevant question ("Looks great, when is the next one?", "Well done, how long did this take?").
 Emojis are fine only if they fit naturally. Avoid generic 🚀🔥💎🙌.
 
-Examples of good replies:
+IMPORTANT LANGUAGE RULES:
+- NEVER use contractions ending with 's (like "what's", "how's", "when's", "where's", "who's", "it's", "that's", "here's", "there's")
+- ALWAYS use full forms: "what is", "how is", "when is", "where is", "who is", "it is", "that is", "here is", "there is"
+- Use natural, conversational English without apostrophes in contractions
+- Keep the tone friendly and genuine
+
+Examples of good replies (following the rules):
 "Nice work, how did you come up with this?"
-"Congrats! what’s next?"
+"Congrats! what is next?"
 "Looks great, did you make it yourself?"
 "Thanks for sharing, where can I read more?"
 "Well done, how long did it take?"
 "Appreciate this, any tips for others?"
-"All good here, how’s your side?"
+"All good here, how is your side?"
+"Great job, what inspired this?"
+"Amazing work, how did you learn this?"
+"Impressive, what tools did you use?"
 
 Recent replies:
 ${historyText || "(no history yet)"}
@@ -183,13 +238,14 @@ ${historyText || "(no history yet)"}
 New tweet:
 "${caption}"
 
-Your reply (1 sentence, natural and simple, short reaction + optional light question):
+Your reply (1 sentence, natural and simple, short reaction + optional light question, NO contractions with 's):
 
 `;
 
   const spinner = startSpinner(`${req._id} /generate`, "AI thinking");
   try {
-    const reply = await generateReplyFromGrok(prompt);
+    const rawReply = await generateReplyFromGrok(prompt);
+    const reply = removeContractions(rawReply);
     const elapsed = Date.now() - req._t0;
 
     if (!reply || reply.trim().length < 5 || reply.includes(caption.trim())) {
@@ -252,7 +308,7 @@ app.post("/generate-discord", async (req, res) => {
     .join("\n\n");
 
   const prompt = `
-You are a friendly Discord user in the "${roomId}" community. Always natural, casual, and short. Never robotic, never template.
+You are a friendly Discord user in the "${roomId}" community. Always natural, casual, and conversational. Never robotic, never template-like.
 
 Your task:
 Write ONE short and authentic reply to the new message below.
@@ -263,13 +319,25 @@ No need for slang, just talk like a normal person in chat.
 Keep it friendly, clear, and simple.
 Emojis are fine if they fit naturally or are from the community set: ${JSON.stringify(kodeEmoji)}. Avoid generic 🚀🔥🙌💎.
 
-Examples of good replies:
-"I'm good, how are you?"
+IMPORTANT LANGUAGE RULES:
+- NEVER use contractions ending with 's (like "what's", "how's", "when's", "where's", "who's", "it's", "that's", "here's", "there's", "I'm", "you're", "we're", "they're")
+- ALWAYS use full forms: "what is", "how is", "when is", "where is", "who is", "it is", "that is", "here is", "there is", "I am", "you are", "we are", "they are"
+- Use natural, conversational English without apostrophes in contractions
+- Keep the tone friendly and genuine
+
+Examples of good replies (following the rules):
+"I am good, how are you?"
 "Fine, thanks for asking"
 "All good here"
 "Thanks, I appreciate it"
 "Just relaxing right now"
 "Glad to see you here"
+"Great to hear from you"
+"What is up today?"
+"How is everything going?"
+"Nice to see you here"
+"Hope you are doing well"
+"What brings you here?"
 
 Recent replies:
 ${historyText || "(no history yet)"}
@@ -277,7 +345,7 @@ ${historyText || "(no history yet)"}
 New message:
 "${caption}"
 
-Your reply (1 sentence, natural and simple):
+Your reply (1 sentence, natural and simple, NO contractions with 's):
 
 ${tambahan}
 
@@ -285,7 +353,8 @@ ${tambahan}
 
   const spinner = startSpinner(`${req._id} /generate-discord`, "AI thinking");
   try {
-    const reply = await generateReplyFromGrok(prompt);
+    const rawReply = await generateReplyFromGrok(prompt);
+    const reply = removeContractions(rawReply);
     const elapsed = Date.now() - req._t0;
 
     if (!reply || reply.trim().length < 5 || reply.includes(caption.trim())) {
@@ -347,12 +416,21 @@ Requirements:
 - Do NOT use commas. Do NOT output multiple sentences. One sentence only.
 - Match the vibe of recent messages.
 
+IMPORTANT LANGUAGE RULES:
+- NEVER use contractions ending with 's (like "what's", "how's", "when's", "where's", "who's", "it's", "that's", "here's", "there's", "I'm", "you're", "we're", "they're")
+- ALWAYS use full forms: "what is", "how is", "when is", "where is", "who is", "it is", "that is", "here is", "there is", "I am", "you are", "we are", "they are"
+- Use natural, conversational English without apostrophes in contractions
+
 Output format:
 - ONE line only, the message itself.
 - No quotes, no bullets, no numbering, no extra text, no line breaks.
 
-Style example (do NOT copy literally):
+Style examples (do NOT copy literally):
 How are you doing?
+What is up today?
+How is everyone doing?
+What is new today?
+How is your day going?
 
 Recent messages:
 ${sampleText || "(no messages)"}
@@ -360,16 +438,19 @@ ${sampleText || "(no messages)"}
 Optional user hint (may be empty):
 ${sanitizeText(hint)}
 
-Now output exactly ONE short message (2–8 words), no commas.
+Now output exactly ONE short message (2–8 words), no commas, NO contractions with 's.
 `.trim();
 
     const raw = await generateReplyFromGrok(prompt) || "";
 
     // Normalisasi ke satu kalimat pendek
     let line = raw.replace(/[\r\n]+/g, " ").trim();
-    line = line.replace(/^["'“”`]+|["'“”`]+$/g, "");   // buang kutip pembungkus
+    line = line.replace(/^["'""`]+|["'""`]+$/g, "");   // buang kutip pembungkus
     line = line.replace(/[—-]+/g, " ");                 // larang em-dash/hyphen → spasi
     line = line.replace(/\s+/g, " ").trim();
+    
+    // Remove contractions
+    line = removeContractions(line);
 
     // Validasi: satu pesan saja, tanpa koma, panjang wajar
     const wordCount = line ? line.split(/\s+/).length : 0;
@@ -380,7 +461,7 @@ Now output exactly ONE short message (2–8 words), no commas.
       const FALLBACK = {
         cys: "How are you doing?",
         mmt: "How are you doing?",
-        fgo: "What’s good today?",
+        fgo: "What is good today?",
         rialo: "How are you doing?",
         fastTest: "How are you doing?",
         default: "How are you doing?",
@@ -422,13 +503,58 @@ Original: "${sanitizeText(text)}"
 Rewritten:
     `.trim();
 
-    const improved = await generateReplyFromGrok(prompt);
+    const rawImproved = await generateReplyFromGrok(prompt);
+    const improved = removeContractions(rawImproved);
     spinner.stop(true, `${COLORS.green}ok${COLORS.reset}`);
     return res.json({ text: improved?.trim() || "" });
   } catch (err) {
     spinner.stop(false, `${COLORS.red}error${COLORS.reset}`);
     logErr(`${COLORS.cyan}${req._id}${COLORS.reset} Error (/generate-parafrase): ${err?.message || err}`);
     return res.status(500).json({ error: "Failed to paraphrase" });
+  }
+});
+
+// === Quick Generate (Twitter/X)
+app.post("/generate-quick", async (req, res) => {
+  const { caption, roomId } = req.body;
+  if (!caption || !roomId) {
+    logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing caption/roomId on /generate-quick`);
+    return res.status(400).json({ error: "caption and roomId are required" });
+  }
+
+  const spinner = startSpinner(`${req._id} /generate-quick`, "AI thinking");
+  try {
+    const prompt = `
+You are a friendly user in the "${roomId}" community. Write a quick, natural reply to this tweet.
+
+Requirements:
+- ONE short sentence only
+- Natural and conversational tone
+- NO contractions ending with 's (use "what is", "how is", "it is", etc.)
+- Keep it simple and genuine
+
+Tweet: "${sanitizeText(caption)}"
+
+Your quick reply (1 sentence, natural, NO contractions with 's):
+`.trim();
+
+    const rawReply = await generateReplyFromGrok(prompt);
+    const reply = removeContractions(rawReply);
+    const elapsed = Date.now() - req._t0;
+
+    if (!reply || reply.trim().length < 5) {
+      spinner.stop(false, `${COLORS.red}invalid reply${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
+      return res.status(500).json({ error: "Reply not valid" });
+    }
+
+    spinner.stop(true, `${COLORS.green}ok${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
+    logOk(`${COLORS.cyan}${req._id}${COLORS.reset} Quick reply: ${COLORS.gray}"${reply.trim()}"${COLORS.reset}`);
+    res.json({ reply });
+  } catch (err) {
+    const elapsed = Date.now() - req._t0;
+    spinner.stop(false, `${COLORS.red}error${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
+    logErr(`${COLORS.cyan}${req._id}${COLORS.reset} Error (Quick): ${err?.message || err}`);
+    res.status(500).json({ error: "Gagal generate quick reply" });
   }
 });
 
@@ -452,7 +578,8 @@ Indonesian: "${sanitizeText(text)}"
 English:
     `.trim();
 
-    const translated = await generateReplyFromGrok(prompt);
+    const rawTranslated = await generateReplyFromGrok(prompt);
+    const translated = removeContractions(rawTranslated);
     spinner.stop(true, `${COLORS.green}ok${COLORS.reset}`);
     return res.json({ text: translated?.trim() || "" });
   } catch (err) {

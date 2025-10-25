@@ -1,26 +1,306 @@
-// content-discord.js
+// content-discord.js - Enhanced Discord Integration
+
+// === Enhanced Configuration
+const CONFIG = {
+  ROOMS: ["mmt", "cys", "mega", "fgo", "rialo", "lighter", "town"],
+  MAX_REPLIES: 20,
+  API_BASE_URL: "https://autoreply-gt64.onrender.com",
+  RETRY_ATTEMPTS: 3,
+  RETRY_DELAY: 1000,
+  THEME: {
+    primary: "#5865F2",
+    secondary: "#2b2d31", 
+    accent: "rgba(88,101,242,.2)",
+    text: "#e7e9ea",
+    border: "#3b3d43",
+    success: "#00ba7c",
+    error: "#f4212e",
+    warning: "#ffd400"
+  }
+};
+
+// === Enhanced Storage & Settings
+class ExtensionSettings {
+  constructor() {
+    this.settings = this.loadSettings();
+  }
+
+  loadSettings() {
+    try {
+      const stored = localStorage.getItem('geminiExtensionSettings');
+      return stored ? JSON.parse(stored) : this.getDefaultSettings();
+    } catch {
+      return this.getDefaultSettings();
+    }
+  }
+
+  getDefaultSettings() {
+    return {
+      autoGenerate: false,
+      showPreview: true,
+      maxReplies: 20,
+      selectedRoom: CONFIG.ROOMS[0],
+      theme: 'dark',
+      notifications: true,
+      analytics: true,
+      autoPaste: false,
+      openComposer: true
+    };
+  }
+
+  saveSettings() {
+    try {
+      localStorage.setItem('geminiExtensionSettings', JSON.stringify(this.settings));
+    } catch (e) {
+      console.warn('Failed to save settings:', e);
+    }
+  }
+
+  get(key) {
+    return this.settings[key];
+  }
+
+  set(key, value) {
+    this.settings[key] = value;
+    this.saveSettings();
+  }
+}
+
+const settings = new ExtensionSettings();
+
+// === Enhanced Analytics & Tracking
+class Analytics {
+  constructor() {
+    this.events = this.loadEvents();
+  }
+
+  loadEvents() {
+    try {
+      const stored = localStorage.getItem('geminiAnalytics');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  saveEvents() {
+    try {
+      localStorage.setItem('geminiAnalytics', JSON.stringify(this.events));
+    } catch (e) {
+      console.warn('Failed to save analytics:', e);
+    }
+  }
+
+  track(event, data = {}) {
+    if (!settings.get('analytics')) return;
+    
+    const eventData = {
+      timestamp: Date.now(),
+      event,
+      data,
+      url: window.location.href,
+      userAgent: navigator.userAgent,
+      platform: 'discord'
+    };
+    
+    this.events.push(eventData);
+    
+    // Keep only last 1000 events
+    if (this.events.length > 1000) {
+      this.events = this.events.slice(-1000);
+    }
+    
+    this.saveEvents();
+  }
+
+  getStats() {
+    const now = Date.now();
+    const last24h = now - (24 * 60 * 60 * 1000);
+    const last7d = now - (7 * 24 * 60 * 60 * 1000);
+    
+    const recent = this.events.filter(e => e.timestamp > last24h);
+    const weekly = this.events.filter(e => e.timestamp > last7d);
+    
+    return {
+      total: this.events.length,
+      last24h: recent.length,
+      last7d: weekly.length,
+      byEvent: this.events.reduce((acc, e) => {
+        acc[e.event] = (acc[e.event] || 0) + 1;
+        return acc;
+      }, {}),
+      byRoom: this.events
+        .filter(e => e.data.roomId)
+        .reduce((acc, e) => {
+          acc[e.data.roomId] = (acc[e.data.roomId] || 0) + 1;
+          return acc;
+        }, {})
+    };
+  }
+}
+
+const analytics = new Analytics();
+
+// === Enhanced Error Handling & Retry Logic
+class ApiClient {
+  constructor(baseUrl) {
+    this.baseUrl = baseUrl;
+  }
+
+  async request(endpoint, options = {}, retryCount = 0) {
+    const url = `${this.baseUrl}${endpoint}`;
+    const defaultOptions = {
+      headers: { "Content-Type": "application/json" },
+      timeout: 30000
+    };
+    
+    const requestOptions = { ...defaultOptions, ...options };
+    
+    try {
+      analytics.track('api_request_start', { endpoint, retryCount, platform: 'discord' });
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), requestOptions.timeout);
+      
+      const response = await fetch(url, {
+        ...requestOptions,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      analytics.track('api_request_success', { endpoint, retryCount, platform: 'discord' });
+      
+      return data;
+    } catch (error) {
+      analytics.track('api_request_error', { 
+        endpoint, 
+        retryCount, 
+        error: error.message,
+        platform: 'discord'
+      });
+      
+      if (retryCount < CONFIG.RETRY_ATTEMPTS && this.shouldRetry(error)) {
+        await this.delay(CONFIG.RETRY_DELAY * (retryCount + 1));
+        return this.request(endpoint, options, retryCount + 1);
+      }
+      
+      throw error;
+    }
+  }
+
+  shouldRetry(error) {
+    return error.name === 'AbortError' || 
+           error.message.includes('Failed to fetch') ||
+           error.message.includes('NetworkError');
+  }
+
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+const apiClient = new ApiClient(CONFIG.API_BASE_URL);
 
 // ====================
-// Util & reply context
+// Enhanced Util & reply context
 // ====================
+// === Enhanced Message Analysis with Better Context
 async function getNearbyReplies(currentMessage) {
   const replies = [];
-  const allMessages = document.querySelectorAll('[id^="chat-messages-"] > div');
+  const maxReplies = settings.get('maxReplies') || CONFIG.MAX_REPLIES;
+
+  // Multiple strategies to find messages
+  const messageSelectors = [
+    '[id^="chat-messages-"] > div',
+    '[class*="message"]',
+    '[data-list-item-id*="chat-messages"]'
+  ];
+
+  let allMessages = [];
+  
+  // Try each selector strategy
+  for (const selector of messageSelectors) {
+    try {
+      allMessages = document.querySelectorAll(selector);
+      if (allMessages.length > 0) {
+        console.log(`[Gemini Discord] Found ${allMessages.length} messages using selector: ${selector}`);
+        break;
+      }
+    } catch (e) {
+      console.warn(`[Gemini Discord] Selector failed: ${selector}`, e);
+    }
+  }
 
   for (const msg of allMessages) {
     if (msg === currentMessage) continue;
 
     const { contentText, username } = extractMessagePieces(msg);
-    if (contentText && username) {
-      replies.push({ username, reply: contentText });
+    if (contentText && username && contentText.length > 3) {
+      // Add timestamp and engagement data if available
+      const timestamp = msg.querySelector('time')?.getAttribute('datetime');
+      const reactions = msg.querySelectorAll('[class*="reaction"]');
+      const reactionCount = reactions.length;
+      
+      replies.push({ 
+        username, 
+        reply: contentText,
+        timestamp,
+        reactions: reactionCount,
+        engagement: reactionCount
+      });
     }
-    if (replies.length >= 20) break;
+    if (replies.length >= maxReplies) break;
   }
+
+  // Sort by engagement for better context
+  replies.sort((a, b) => b.engagement - a.engagement);
+  
+  analytics.track('discord_messages_collected', { 
+    count: replies.length,
+    maxReplies,
+    platform: 'discord'
+  });
+
+  console.log(`[Gemini Discord] Total messages collected: ${replies.length}`);
   return replies;
 }
 
 function copyToClipboard(text) {
   return navigator.clipboard.writeText(text);
+}
+
+// === Enhanced Notification System
+function showNotification(message, type = 'info') {
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: ${type === 'success' ? CONFIG.THEME.success : type === 'error' ? CONFIG.THEME.error : CONFIG.THEME.primary};
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    z-index: 2147483647;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    animation: slideIn 0.3s ease-out;
+    max-width: 300px;
+  `;
+  
+  notification.textContent = message;
+  document.body.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.style.animation = 'slideOut 0.3s ease-in';
+    setTimeout(() => notification.remove(), 300);
+  }, 3000);
 }
 
 function showMiniToast(anchorEl, msg = "Copied!") {
@@ -102,20 +382,182 @@ function extractMessagePieces(messageEl) {
   return { contentEl, usernameEl, contentText, username };
 }
 
-// ===== Global Room Selector (single dropdown di header) =====
-const ROOM_IDS = ["mmt", "cys","mega", "fgo", "rialo", "lighter"];
-let selectedRoomId = (() => {
-  try { return localStorage.getItem("geminiSelectedRoom") || ROOM_IDS[0]; } catch { return ROOM_IDS[0]; }
-})();
+// === Global Room Selector for Discord (Fixed Position)
+let globalRoomSelector = null;
+
+function createGlobalRoomSelector() {
+  if (globalRoomSelector) return globalRoomSelector;
+
+  const selectedRoom = settings.get('selectedRoom') || CONFIG.ROOMS[0];
+
+  // Create global room selector
+  const selector = document.createElement("div");
+  selector.className = "gemini-global-room-selector";
+  selector.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: ${CONFIG.THEME.secondary};
+    border: 1px solid ${CONFIG.THEME.border};
+    border-radius: 12px;
+    padding: 12px 16px;
+    z-index: 2147483646;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    transition: all 0.3s ease;
+  `;
+
+  // Room info mapping
+  const roomInfo = {
+    rialo: { icon: "🏛️", name: "Rialo" },
+    lighter: { icon: "💡", name: "Lighter" },
+    mmt: { icon: "🚀", name: "MMT" },
+    cys: { icon: "🎯", name: "Cysic" },
+    mega: { icon: "⚡", name: "Mega" },
+    fgo: { icon: "🎮", name: "FGO" },
+    town: { icon: "🏘️", name: "Town" }
+  };
+
+  const currentRoom = roomInfo[selectedRoom] || { icon: "💬", name: selectedRoom };
+
+  selector.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="font-size: 16px;">${currentRoom.icon}</span>
+      <span style="color: ${CONFIG.THEME.text}; font-size: 14px; font-weight: 500;">${currentRoom.name}</span>
+    </div>
+    <div class="gemini-room-dropdown-trigger" style="
+      background: ${CONFIG.THEME.primary};
+      color: white;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s ease;
+    ">Change</div>
+  `;
+
+  // Create dropdown menu
+  const menu = createOptionsPortal(CONFIG.ROOMS, (chosen) => {
+    const room = roomInfo[chosen] || { icon: "💬", name: chosen };
+    selector.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 16px;">${room.icon}</span>
+        <span style="color: ${CONFIG.THEME.text}; font-size: 14px; font-weight: 500;">${room.name}</span>
+      </div>
+      <div class="gemini-room-dropdown-trigger" style="
+        background: ${CONFIG.THEME.primary};
+        color: white;
+        border: none;
+        padding: 6px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s ease;
+      ">Change</div>
+    `;
+    settings.set('selectedRoom', chosen);
+    hideMenu();
+    
+    // Update all existing message interfaces
+    updateAllMessageInterfaces();
+    
+    if (settings.get('notifications')) {
+      showNotification(`Room changed to ${room.name}`, "success");
+    }
+  });
+
+  // Hover effects
+  selector.addEventListener('mouseenter', () => {
+    selector.style.transform = 'translateY(-2px)';
+    selector.style.boxShadow = '0 12px 30px rgba(0,0,0,0.4)';
+  });
+  
+  selector.addEventListener('mouseleave', () => {
+    selector.style.transform = 'translateY(0)';
+    selector.style.boxShadow = '0 8px 25px rgba(0,0,0,0.3)';
+  });
+
+  // Dropdown positioning
+  function placeMenu() {
+    const r = selector.getBoundingClientRect();
+    menu.style.minWidth = Math.max(160, r.width) + "px";
+    menu.style.top = window.scrollY + r.bottom + 6 + "px";
+    menu.style.right = window.innerWidth - r.right + "px";
+  }
+
+  function showMenu() {
+    placeMenu();
+    menu.style.display = "block";
+  }
+  
+  function hideMenu() {
+    menu.style.display = "none";
+  }
+
+  // Click to show dropdown
+  selector.addEventListener('click', (e) => {
+    if (e.target.classList.contains('gemini-room-dropdown-trigger')) {
+      showMenu();
+    }
+  });
+
+  // Close on outside click
+  document.addEventListener('click', (e) => {
+    if (!selector.contains(e.target) && !menu.contains(e.target)) {
+      hideMenu();
+    }
+  });
+
+  // Update position on scroll/resize
+  const onScrollResize = () => {
+    if (menu.style.display === "block") placeMenu();
+  };
+  window.addEventListener("scroll", onScrollResize, true);
+  window.addEventListener("resize", onScrollResize);
+
+  document.body.appendChild(selector);
+  globalRoomSelector = selector;
+
+  analytics.track('global_room_selector_created', { selectedRoom, platform: 'discord' });
+  
+  return selector;
+}
+
+// === Update all message interfaces when room changes
+function updateAllMessageInterfaces() {
+  const wrappers = document.querySelectorAll('.gemini-reply-wrapper');
+  wrappers.forEach(wrapper => {
+    const currentRoom = settings.get('selectedRoom') || CONFIG.ROOMS[0];
+    const roomInfo = {
+      rialo: { icon: "🏛️", name: "Rialo" },
+      lighter: { icon: "💡", name: "Lighter" },
+      mmt: { icon: "🚀", name: "MMT" },
+      cys: { icon: "🎯", name: "Cysic" },
+      mega: { icon: "⚡", name: "Mega" },
+      fgo: { icon: "🎮", name: "FGO" },
+      town: { icon: "🏘️", name: "Town" }
+    };
+    
+    const room = roomInfo[currentRoom] || { icon: "💬", name: currentRoom };
+    
+    // Update any room display in the wrapper if exists
+    const roomDisplay = wrapper.querySelector('.current-room-display');
+    if (roomDisplay) {
+      roomDisplay.innerHTML = `
+        <span style="font-size: 12px; opacity: 0.7;">Current Room:</span>
+        <span style="font-size: 14px;">${room.icon} ${room.name}</span>
+      `;
+    }
+  });
+}
 
 function getSelectedRoomId() {
-  return selectedRoomId || ROOM_IDS[0];
-}
-function setSelectedRoomId(val) {
-  selectedRoomId = val;
-  try { localStorage.setItem("geminiSelectedRoom", val); } catch {}
-  const trigger = document.querySelector(".gemini-room-trigger");
-  if (trigger) trigger.textContent = val;
+  return settings.get('selectedRoom') || CONFIG.ROOMS[0];
 }
 
 // ===== Custom dropdown (portal ke <body>) =====
@@ -156,64 +598,9 @@ function createOptionsPortal(items, onSelect) {
   return menu;
 }
 
-// Inject 1 dropdown ke header server
-function injectServerRoomDropdown() {
-  const header = document.querySelector("header.header_f37cb1");
-  if (!header) return;
-
-  const host = header.querySelector(".headerChildren_f37cb1") || header;
-  if (!host || host.querySelector(".gemini-room-trigger")) return;
-
-  const trigger = document.createElement("div");
-  trigger.className = "gemini-room-trigger";
-  trigger.style.cssText = `
-    margin-left: 8px;
-    background: #1e1f22;
-    color: #e7e9ea;
-    border: 1px solid #3b3d43;
-    padding: 2px 8px;
-    border-radius: 6px;
-    font-size: 12px;
-    cursor: pointer;
-    user-select: none;
-    line-height: 18px;
-  `;
-  trigger.textContent = getSelectedRoomId();
-
-  const menu = createOptionsPortal(ROOM_IDS, (chosen) => {
-    setSelectedRoomId(chosen);
-    hideMenu();
-  });
-
-  function placeMenu() {
-    const r = trigger.getBoundingClientRect();
-    menu.style.minWidth = Math.max(140, r.width) + "px";
-    menu.style.top = window.scrollY + r.bottom + 6 + "px";
-    menu.style.left = window.scrollX + r.left + "px";
-  }
-  function showMenu() { placeMenu(); menu.style.display = "block"; }
-  function hideMenu() { menu.style.display = "none"; }
-
-  let hoverInside = false, hideTimer = null;
-  const scheduleHide = () => {
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => { if (!hoverInside) hideMenu(); }, 150);
-  };
-
-  trigger.addEventListener("mouseenter", () => { hoverInside = true; clearTimeout(hideTimer); showMenu(); });
-  trigger.addEventListener("mouseleave", () => { hoverInside = false; scheduleHide(); });
-  menu.addEventListener("mouseenter", () => { hoverInside = true; clearTimeout(hideTimer); });
-  menu.addEventListener("mouseleave", () => { hoverInside = false; scheduleHide(); });
-
-  const onScrollResize = () => { if (menu.style.display === "block") placeMenu(); };
-  window.addEventListener("scroll", onScrollResize, true);
-  window.addEventListener("resize", onScrollResize);
-
-  host.appendChild(trigger);
-}
 
 // ====================
-// UI per pesan (rooms)
+// Enhanced UI per pesan (rooms)
 // ====================
 function addReplyButtonToMessage(message) {
   if (!message || message.querySelector(".gemini-reply-wrapper")) return;
@@ -222,73 +609,221 @@ function addReplyButtonToMessage(message) {
   if (!contentText) return;
 
   const caption = contentText;
+  const currentRoom = settings.get('selectedRoom') || CONFIG.ROOMS[0];
+  const roomInfo = {
+    rialo: { icon: "🏛️", name: "Rialo" },
+    lighter: { icon: "💡", name: "Lighter" },
+    mmt: { icon: "🚀", name: "MMT" },
+    cys: { icon: "🎯", name: "Cysic" },
+    mega: { icon: "⚡", name: "Mega" },
+    fgo: { icon: "🎮", name: "FGO" },
+    town: { icon: "🏘️", name: "Town" }
+  };
+  const room = roomInfo[currentRoom] || { icon: "💬", name: currentRoom };
 
   const wrapper = document.createElement("div");
   wrapper.className = "gemini-reply-wrapper";
-  wrapper.style = "display: flex; flex-direction: column; gap: 6px; margin-top: 6px;";
+  wrapper.style.cssText = `
+    display: flex; 
+    flex-direction: column; 
+    gap: 8px; 
+    margin-top: 8px;
+    padding: 12px;
+    background: rgba(30, 31, 34, 0.8);
+    border: 1px solid ${CONFIG.THEME.border};
+    border-radius: 8px;
+    backdrop-filter: blur(5px);
+  `;
+
+  // Current room display
+  const roomDisplay = document.createElement("div");
+  roomDisplay.className = "current-room-display";
+  roomDisplay.style.cssText = `
+    display: flex; 
+    align-items: center; 
+    gap: 6px; 
+    font-size: 12px; 
+    color: ${CONFIG.THEME.text};
+    opacity: 0.8;
+  `;
+  roomDisplay.innerHTML = `
+    <span>Current Room:</span>
+    <span style="font-weight: 500;">${room.icon} ${room.name}</span>
+  `;
 
   const row = document.createElement("div");
-  row.style = "display: flex; flex-wrap: wrap; gap: 6px; align-items: center; position: relative;";
+  row.style.cssText = `
+    display: flex; 
+    flex-wrap: wrap; 
+    gap: 8px; 
+    align-items: center; 
+    position: relative;
+  `;
 
   let latestReply = "";
 
-  // ===== Tombol Generate (reply) =====
+  // ===== Enhanced Generate Button =====
   const genBtn = document.createElement("button");
-  genBtn.innerText = "💬 Generate";
+  genBtn.innerText = "💬 Generate Reply";
   genBtn.className = "gemini-reply-btn";
-  genBtn.style = `
-    background: #5865F2;
+  genBtn.style.cssText = `
+    background: ${CONFIG.THEME.primary};
     color: white;
     border: none;
-    padding: 2px 8px;
+    padding: 8px 12px;
     border-radius: 6px;
     cursor: pointer;
     font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
   `;
+
+  genBtn.addEventListener('mouseenter', () => {
+    genBtn.style.transform = 'translateY(-1px)';
+    genBtn.style.boxShadow = '0 4px 12px rgba(88, 101, 242, 0.3)';
+  });
+
+  genBtn.addEventListener('mouseleave', () => {
+    genBtn.style.transform = 'translateY(0)';
+    genBtn.style.boxShadow = 'none';
+  });
 
   genBtn.onclick = async () => {
     const roomId = getSelectedRoomId();
-    if (!roomId) return alert("Pilih room terlebih dahulu (di header).");
+    if (!roomId) {
+      showNotification("Please select a room first", "error");
+      return;
+    }
 
+    analytics.track('discord_generate_start', { roomId, platform: 'discord' });
     setBtnLoading(genBtn, true);
+    
     try {
+      const startTime = Date.now();
       const komentar = await getNearbyReplies(message);
-      const res = await fetch("http://localhost:3000/generate-discord", {
+      
+      const data = await apiClient.request("/generate-discord", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caption, roomId, komentar }),
+        body: JSON.stringify({ caption, roomId, komentar })
       });
 
-      const data = await res.json();
-      latestReply = data.reply || "Gagal generate 😅";
+      const generationTime = Date.now() - startTime;
+      latestReply = data.reply || "Failed to generate reply 😅";
 
       await copyToClipboard(latestReply);
-      showMiniToast(genBtn, "Generated ✓ copied");
+      
+      analytics.track('discord_generate_success', { 
+        roomId, 
+        generationTime,
+        replyLength: latestReply.length,
+        platform: 'discord'
+      });
+      
+      if (settings.get('notifications')) {
+        showNotification("Reply generated and copied to clipboard!", "success");
+      }
+      
       setBtnLoading(genBtn, false, "✅ Done!");
     } catch (err) {
       console.error("❌ Error:", err);
-      alert("Gagal menghubungi backend lokal.");
+      analytics.track('discord_generate_error', { 
+        roomId, 
+        error: err.message,
+        platform: 'discord'
+      });
+      
+      if (settings.get('notifications')) {
+        showNotification("Failed to generate reply. Please try again.", "error");
+      } else {
+        alert("Failed to connect to backend.");
+      }
       setBtnLoading(genBtn, false, "❌ Error");
     }
   };
 
-  // (opsional) tombol copy manual
-  const copyBtn = document.createElement("button");
-  copyBtn.innerText = "📌 Copy Reply";
-  copyBtn.style = `
-    display: none;
-    background: #4caf50;
+  // ===== Quick Actions =====
+  const quickBtn = document.createElement("button");
+  quickBtn.innerText = "⚡ Quick";
+  quickBtn.style.cssText = `
+    background: ${CONFIG.THEME.success};
     color: white;
     border: none;
-    padding: 2px 6px;
-    border-radius: 4px;
+    padding: 6px 10px;
+    border-radius: 6px;
     cursor: pointer;
     font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
   `;
-  copyBtn.onclick = () => { if (latestReply) copyToClipboard(latestReply); };
+  quickBtn.onclick = async () => {
+    const roomId = getSelectedRoomId();
+    if (!roomId) {
+      showNotification("Please select a room first", "error");
+      return;
+    }
+
+    setBtnLoading(quickBtn, true);
+    try {
+      const data = await apiClient.request("/generate-quick", {
+        method: "POST",
+        body: JSON.stringify({ caption, roomId })
+      });
+      
+      latestReply = data.reply || "Quick reply generated!";
+      await copyToClipboard(latestReply);
+      
+      if (settings.get('notifications')) {
+        showNotification("Quick reply generated!", "success");
+      }
+      
+      setBtnLoading(quickBtn, false, "✅");
+    } catch (err) {
+      console.error("Quick generate error:", err);
+      setBtnLoading(quickBtn, false, "❌");
+    }
+  };
+
+  // ===== Settings Button =====
+  const settingsBtn = document.createElement("button");
+  settingsBtn.innerText = "⚙️ Settings";
+  settingsBtn.style.cssText = `
+    background: ${CONFIG.THEME.secondary};
+    color: ${CONFIG.THEME.text};
+    border: 1px solid ${CONFIG.THEME.border};
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `;
+  settingsBtn.onclick = () => showSettingsPanel();
+
+  // ===== Debug Button =====
+  const debugBtn = document.createElement("button");
+  debugBtn.innerText = "🐛 Debug";
+  debugBtn.style.cssText = `
+    background: ${CONFIG.THEME.warning};
+    color: #000;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `;
+  debugBtn.onclick = () => debugMessageDetection(message);
 
   row.appendChild(genBtn);
-  row.appendChild(copyBtn);
+  row.appendChild(quickBtn);
+  row.appendChild(settingsBtn);
+  row.appendChild(debugBtn);
+  
+  wrapper.appendChild(roomDisplay);
   wrapper.appendChild(row);
 
   // ===== Section: Generate Topic (pakai room global) =====
@@ -329,7 +864,7 @@ function addReplyButtonToMessage(message) {
       const nearby = await getNearbyReplies(message);
       const examples = nearby.slice(0, 10);
 
-      const res = await fetch("http://localhost:3000/generate-topic", {
+      const res = await fetch("https://autoreply-gt64.onrender.com/generate-topic", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomId, hint, examples }),
@@ -369,7 +904,7 @@ function addReplyButtonToMessage(message) {
     if (!text) return alert("Isi dulu teks yang mau diterjemahkan.");
     setBtnLoading(translateBtn, true);
     try {
-      const res = await fetch("http://localhost:3000/generate-translate", {
+      const res = await fetch("https://autoreply-gt64.onrender.com/generate-translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
@@ -401,7 +936,7 @@ function addReplyButtonToMessage(message) {
     if (!text) return alert("Isi dulu teks yang mau diperbaiki.");
     setBtnLoading(paraphraseBtn, true);
     try {
-      const res = await fetch("http://localhost:3000/generate-parafrase", {
+      const res = await fetch("https://autoreply-gt64.onrender.com/generate-parafrase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
@@ -423,6 +958,183 @@ function addReplyButtonToMessage(message) {
   wrapper.appendChild(manualContainer);
 
   message.appendChild(wrapper);
+}
+
+// === Settings Panel for Discord
+function showSettingsPanel() {
+  // Remove existing panel if any
+  const existing = document.querySelector('.gemini-settings-panel');
+  if (existing) {
+    existing.remove();
+    return;
+  }
+
+  const panel = document.createElement('div');
+  panel.className = 'gemini-settings-panel';
+  panel.style.cssText = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: ${CONFIG.THEME.secondary};
+    border: 1px solid ${CONFIG.THEME.border};
+    border-radius: 12px;
+    padding: 24px;
+    z-index: 2147483647;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    backdrop-filter: blur(10px);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  `;
+
+  const stats = analytics.getStats();
+
+  panel.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h3 style="color: ${CONFIG.THEME.text}; margin: 0; font-size: 18px;">⚙️ Discord Settings</h3>
+      <button id="closeSettings" style="
+        background: none; border: none; color: ${CONFIG.THEME.text}; 
+        font-size: 20px; cursor: pointer; padding: 4px;
+      ">×</button>
+    </div>
+    
+    <div style="display: grid; gap: 16px;">
+      <div>
+        <label style="display: block; color: ${CONFIG.THEME.text}; margin-bottom: 8px; font-weight: 500;">
+          <input type="checkbox" id="showPreview" ${settings.get('showPreview') ? 'checked' : ''} style="margin-right: 8px;">
+          Show Reply Preview
+        </label>
+      </div>
+      
+      <div>
+        <label style="display: block; color: ${CONFIG.THEME.text}; margin-bottom: 8px; font-weight: 500;">
+          <input type="checkbox" id="notifications" ${settings.get('notifications') ? 'checked' : ''} style="margin-right: 8px;">
+          Enable Notifications
+        </label>
+      </div>
+      
+      <div>
+        <label style="display: block; color: ${CONFIG.THEME.text}; margin-bottom: 8px; font-weight: 500;">
+          <input type="checkbox" id="analytics" ${settings.get('analytics') ? 'checked' : ''} style="margin-right: 8px;">
+          Enable Analytics
+        </label>
+      </div>
+      
+      <div>
+        <label style="display: block; color: ${CONFIG.THEME.text}; margin-bottom: 8px; font-weight: 500;">
+          <input type="checkbox" id="autoPaste" ${settings.get('autoPaste') ? 'checked' : ''} style="margin-right: 8px;">
+          Auto Paste Replies
+        </label>
+      </div>
+      
+      <div>
+        <label style="display: block; color: ${CONFIG.THEME.text}; margin-bottom: 8px; font-weight: 500;">
+          Max Messages to Analyze: 
+          <input type="range" id="maxReplies" min="5" max="50" value="${settings.get('maxReplies') || 20}" 
+                 style="margin-left: 8px; width: 100px;">
+          <span id="maxRepliesValue">${settings.get('maxReplies') || 20}</span>
+        </label>
+      </div>
+    </div>
+    
+    <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid ${CONFIG.THEME.border};">
+      <h4 style="color: ${CONFIG.THEME.text}; margin: 0 0 12px 0; font-size: 14px;">📊 Analytics</h4>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px; color: ${CONFIG.THEME.text};">
+        <div>Total Events: <strong>${stats.total}</strong></div>
+        <div>Last 24h: <strong>${stats.last24h}</strong></div>
+        <div>Last 7d: <strong>${stats.last7d}</strong></div>
+        <div>Platform: <strong>Discord</strong></div>
+      </div>
+      
+      <div style="margin-top: 12px;">
+        <button id="exportAnalytics" style="
+          background: ${CONFIG.THEME.primary}; color: white; border: none; 
+          padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 12px;
+        ">📤 Export Analytics</button>
+      </div>
+    </div>
+  `;
+
+  // Event listeners
+  document.getElementById('closeSettings').onclick = () => panel.remove();
+  
+  document.getElementById('showPreview').onchange = (e) => {
+    settings.set('showPreview', e.target.checked);
+  };
+  
+  document.getElementById('notifications').onchange = (e) => {
+    settings.set('notifications', e.target.checked);
+  };
+  
+  document.getElementById('analytics').onchange = (e) => {
+    settings.set('analytics', e.target.checked);
+  };
+  
+  document.getElementById('autoPaste').onchange = (e) => {
+    settings.set('autoPaste', e.target.checked);
+  };
+  
+  document.getElementById('maxReplies').oninput = (e) => {
+    const value = parseInt(e.target.value);
+    settings.set('maxReplies', value);
+    document.getElementById('maxRepliesValue').textContent = value;
+  };
+  
+  document.getElementById('exportAnalytics').onclick = () => {
+    const dataStr = JSON.stringify(analytics.events, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `gemini-discord-analytics-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Close on outside click
+  panel.onclick = (e) => e.stopPropagation();
+  document.addEventListener('click', () => panel.remove(), { once: true });
+
+  document.body.appendChild(panel);
+  analytics.track('settings_panel_opened', { platform: 'discord' });
+}
+
+// === Debug Message Detection for Discord
+function debugMessageDetection(message) {
+  console.log('=== Discord Message Debug ===');
+  console.log('Message element:', message);
+  
+  const { contentText, username } = extractMessagePieces(message);
+  console.log('Extracted content:', contentText);
+  console.log('Extracted username:', username);
+  
+  // Test message selectors
+  const selectors = [
+    '[id^="chat-messages-"] > div',
+    '[class*="message"]',
+    '[data-list-item-id*="chat-messages"]'
+  ];
+  
+  selectors.forEach(selector => {
+    try {
+      const elements = document.querySelectorAll(selector);
+      console.log(`Selector "${selector}": ${elements.length} elements found`);
+    } catch (e) {
+      console.log(`Selector "${selector}": Error -`, e.message);
+    }
+  });
+  
+  // Test nearby messages
+  getNearbyReplies(message).then(replies => {
+    console.log('Nearby replies found:', replies.length);
+    console.log('Sample replies:', replies.slice(0, 3));
+  });
+  
+  showNotification("Debug info logged to console", "info");
+  analytics.track('debug_triggered', { platform: 'discord' });
 }
 
 // =====================================
@@ -503,7 +1215,7 @@ function injectComposerToolbar() {
 
     setBtnBusy(btnTranslate, true);
     try {
-      const res = await fetch("http://localhost:3000/generate-translate", {
+      const res = await fetch("https://autoreply-gt64.onrender.com/generate-translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
@@ -528,7 +1240,7 @@ function injectComposerToolbar() {
 
     setBtnBusy(btnParaphrase, true);
     try {
-      const res = await fetch("http://localhost:3000/generate-parafrase", {
+      const res = await fetch("https://autoreply-gt64.onrender.com/generate-parafrase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
@@ -553,8 +1265,83 @@ function injectComposerToolbar() {
   extrasRow.parentElement.appendChild(bar);
 }
 
+// === Enhanced Initialization & CSS Animations
+function initializeDiscordExtension() {
+  console.log('🚀 Initializing Enhanced Gemini Discord Extension...');
+  
+  // Add CSS animations
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    
+    @keyframes slideOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    
+    .gemini-reply-wrapper {
+      animation: fadeIn 0.3s ease-out;
+    }
+    
+    .gemini-global-room-selector {
+      animation: slideIn 0.5s ease-out;
+    }
+    
+    .gemini-reply-btn:hover {
+      animation: pulse 0.3s ease-in-out;
+    }
+  `;
+  document.head.appendChild(style);
+
+  // Create global room selector
+  createGlobalRoomSelector();
+  
+  // Add keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.shiftKey) {
+      switch(e.key) {
+        case 'S':
+          e.preventDefault();
+          showSettingsPanel();
+          break;
+        case 'D':
+          e.preventDefault();
+          const messages = document.querySelectorAll('[id^="chat-messages-"] > div');
+          if (messages.length > 0) {
+            debugMessageDetection(messages[messages.length - 1]);
+          }
+          break;
+        case 'R':
+          e.preventDefault();
+          const lastMessage = document.querySelectorAll('[id^="chat-messages-"] > div');
+          if (lastMessage.length > 0) {
+            const genBtn = lastMessage[lastMessage.length - 1].querySelector('.gemini-reply-btn');
+            if (genBtn) genBtn.click();
+          }
+          break;
+      }
+    }
+  });
+
+  analytics.track('discord_extension_initialized', { platform: 'discord' });
+  console.log('✅ Enhanced Gemini Discord Extension initialized successfully!');
+}
+
 // ===================
-// Observers & boot
+// Enhanced Observers & boot
 // ===================
 const messageObserver = new MutationObserver(() => {
   const messages = document.querySelectorAll('[id^="chat-messages-"] > div');
@@ -567,14 +1354,23 @@ const composerObserver = new MutationObserver(() => {
 });
 composerObserver.observe(document.body, { childList: true, subtree: true });
 
-// Observer untuk inject dropdown di header (satu kali per halaman)
-const headerObserver = new MutationObserver(() => {
-  try { injectServerRoomDropdown(); } catch (_) {}
-});
-headerObserver.observe(document.body, { childList: true, subtree: true });
-
+// Initialize extension
 setTimeout(() => {
+  initializeDiscordExtension();
   document.querySelectorAll('[id^="chat-messages-"] > div').forEach(addReplyButtonToMessage);
   injectComposerToolbar();
-  injectServerRoomDropdown();
-}, 800);
+}, 1000);
+
+// Re-initialize on navigation (Discord is SPA)
+let lastUrl = location.href;
+new MutationObserver(() => {
+  const url = location.href;
+  if (url !== lastUrl) {
+    lastUrl = url;
+    setTimeout(() => {
+      if (!document.querySelector('.gemini-global-room-selector')) {
+        createGlobalRoomSelector();
+      }
+    }, 2000);
+  }
+}).observe(document, { subtree: true, childList: true });

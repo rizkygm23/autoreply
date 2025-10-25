@@ -1,25 +1,44 @@
 {
   "manifest_version": 3,
-  "name": "Gemini Social Assistant",
-  "version": "1.2",
-  "description": "Auto-generate contextual replies for tweets and Discord messages",
-  "permissions": ["activeTab", "scripting"],
+  "name": "Gemini Social Assistant Enhanced",
+  "version": "2.0.0",
+  "description": "Advanced AI-powered auto-reply extension with analytics, previews, and smart features for Twitter/X and Discord",
+  "permissions": [
+    "activeTab", 
+    "scripting", 
+    "storage",
+    "notifications"
+  ],
   "host_permissions": [
     "https://twitter.com/*",
     "https://x.com/*",
-    "https://discord.com/channels/*"
+    "https://discord.com/channels/*",
+    "https://autoreply-gt64.onrender.com/*"
   ],
   "content_scripts": [
     {
       "matches": ["https://x.com/*", "https://twitter.com/*"],
-      "js": ["content.js"]
+      "js": ["content.js"],
+      "run_at": "document_end",
+      "all_frames": false
     },
     {
       "matches": ["https://discord.com/channels/*"],
-      "js": ["content-discord.js"]
+      "js": ["content-discord.js"],
+      "run_at": "document_end",
+      "all_frames": false
     }
   ],
   "action": {
-    "default_title": "Gemini Social Assistant"
+    "default_title": "Gemini Social Assistant Enhanced",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
   }
 }

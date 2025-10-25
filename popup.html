@@ -1,18 +1,238 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Gemini Reply</title>
+    <title>Gemini Social Assistant Enhanced</title>
+    <meta charset="utf-8">
     <style>
-      body { font-family: Arial; padding: 10px; width: 300px; }
-      button { margin-top: 10px; }
-      textarea { width: 100%; height: 100px; }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #15202b, #1a1a1a);
+        color: #e7e9ea;
+        width: 380px;
+        min-height: 500px;
+        padding: 20px;
+      }
+      
+      .header {
+        text-align: center;
+        margin-bottom: 24px;
+      }
+      
+      .logo {
+        font-size: 24px;
+        font-weight: bold;
+        background: linear-gradient(135deg, #1d9bf0, #1a8cd8);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 8px;
+      }
+      
+      .version {
+        font-size: 12px;
+        opacity: 0.7;
+        margin-bottom: 16px;
+      }
+      
+      .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+      
+      .stat-card {
+        background: rgba(29, 155, 240, 0.1);
+        border: 1px solid rgba(29, 155, 240, 0.2);
+        border-radius: 12px;
+        padding: 16px;
+        text-align: center;
+      }
+      
+      .stat-number {
+        font-size: 24px;
+        font-weight: bold;
+        color: #1d9bf0;
+        margin-bottom: 4px;
+      }
+      
+      .stat-label {
+        font-size: 12px;
+        opacity: 0.8;
+      }
+      
+      .quick-actions {
+        margin-bottom: 24px;
+      }
+      
+      .section-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #e7e9ea;
+      }
+      
+      .action-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      
+      .btn {
+        background: linear-gradient(135deg, #1d9bf0, #1a8cd8);
+        color: white;
+        border: none;
+        padding: 12px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      
+      .btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(29, 155, 240, 0.3);
+      }
+      
+      .btn-secondary {
+        background: rgba(47, 51, 54, 0.8);
+        border: 1px solid #2f3336;
+      }
+      
+      .btn-secondary:hover {
+        background: rgba(47, 51, 54, 1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+      
+      .features {
+        margin-bottom: 24px;
+      }
+      
+      .feature-list {
+        list-style: none;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      
+      .feature-list li {
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .feature-list li::before {
+        content: "✨";
+        font-size: 12px;
+      }
+      
+      .footer {
+        text-align: center;
+        font-size: 11px;
+        opacity: 0.6;
+        border-top: 1px solid #2f3336;
+        padding-top: 16px;
+      }
+      
+      .shortcuts {
+        background: rgba(29, 155, 240, 0.05);
+        border: 1px solid rgba(29, 155, 240, 0.1);
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 16px;
+      }
+      
+      .shortcut {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+        font-size: 12px;
+      }
+      
+      .shortcut:last-child {
+        margin-bottom: 0;
+      }
+      
+      .key {
+        background: rgba(29, 155, 240, 0.2);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 10px;
+      }
     </style>
   </head>
   <body>
-    <h3>Reply with Gemini</h3>
-    <textarea id="tweetText" placeholder="Paste tweet here..."></textarea>
-    <button id="generateBtn">Generate Reply</button>
-    <p id="result"></p>
+    <div class="header">
+      <div class="logo">🚀 Gemini Enhanced</div>
+      <div class="version">v2.0.0 - AI Social Assistant</div>
+    </div>
+    
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number" id="totalEvents">-</div>
+        <div class="stat-label">Total Events</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="todayEvents">-</div>
+        <div class="stat-label">Today</div>
+      </div>
+    </div>
+    
+    <div class="shortcuts">
+      <div class="section-title">⌨️ Keyboard Shortcuts</div>
+      <div class="shortcut">
+        <span>Quick Generate</span>
+        <span class="key">Ctrl+Shift+G</span>
+      </div>
+      <div class="shortcut">
+        <span>Open Settings</span>
+        <span class="key">Ctrl+Shift+S</span>
+      </div>
+    </div>
+    
+    <div class="quick-actions">
+      <div class="section-title">⚡ Quick Actions</div>
+      <div class="action-buttons">
+        <button class="btn" id="openSettings">
+          ⚙️ Settings
+        </button>
+        <button class="btn btn-secondary" id="viewAnalytics">
+          📊 Analytics
+        </button>
+      </div>
+    </div>
+    
+    <div class="features">
+      <div class="section-title">✨ New Features</div>
+      <ul class="feature-list">
+        <li>AI-powered contextual replies</li>
+        <li>Multiple room personalities</li>
+        <li>Reply preview & alternatives</li>
+        <li>Real-time analytics</li>
+        <li>Smart error handling</li>
+        <li>Keyboard shortcuts</li>
+        <li>Export data functionality</li>
+        <li>Modern UI/UX design</li>
+      </ul>
+    </div>
+    
+    <div class="footer">
+      <div>Made with ❤️ for better social interactions</div>
+      <div style="margin-top: 4px;">Click on any tweet to get started!</div>
+    </div>
+    
     <script src="popup.js"></script>
   </body>
 </html>
