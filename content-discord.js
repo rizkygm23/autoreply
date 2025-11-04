@@ -307,8 +307,8 @@ function showSimpleLoginModal() {
 
   modal.innerHTML = `
     <div style="
-      background: #1a1a1a;
-      border: 1px solid #333;
+      background: #2b2d31;
+      border: 1px solid #3b3d43;
       border-radius: 12px;
       padding: 24px;
       max-width: 400px;
@@ -411,30 +411,49 @@ function showSimpleLoginModal() {
     loginBtn.disabled = true;
 
     try {
+      console.log('[Gemini Discord] Attempting login for:', email);
       const response = await fetch('https://autoreply-gt64.onrender.com/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
       
-      const data = await response.json();
+      console.log('[Gemini Discord] Login response status:', response.status);
       
       if (response.ok) {
-        // Store user data
-        await chrome.storage.local.set({ geminiUser: data.user });
-        modal.remove();
-        showNotification('Login successful! Welcome to Gemini Auto Reply!', 'success');
+        const data = await response.json();
+        console.log('[Gemini Discord] Login response data:', data);
         
-        // Retry the original action
-        if (originalAction) {
-          originalAction();
+        if (data.user) {
+          // Store user data
+          await chrome.storage.local.set({ geminiUser: data.user });
+          console.log('[Gemini Discord] User data stored:', data.user);
+          modal.remove();
+          showNotification('Login successful! Welcome to Gemini Auto Reply!', 'success');
+          
+          // Notify content scripts about login
+          chrome.runtime.sendMessage({ type: 'USER_LOGGED_IN', user: data.user });
+          
+          // Retry the original action
+          if (originalAction) {
+            originalAction();
+          }
+        } else {
+          console.error('[Gemini Discord] No user data in response:', data);
+          alert('Login failed. Invalid response from server.');
         }
       } else {
-        alert(data.error || 'Login failed');
+        const errorData = await response.json();
+        console.error('[Gemini Discord] Login failed:', errorData);
+        alert(errorData.error || 'Login failed. Please check your credentials.');
       }
     } catch (error) {
-      console.error('Login error:', error);
-      alert('Login failed. Please try again.');
+      console.error('[Gemini Discord] Login error:', error);
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        alert('Login failed. Please check your internet connection and try again.');
+      } else {
+        alert('Login failed. Please try again.');
+      }
     } finally {
       loginBtn.textContent = originalText;
       loginBtn.disabled = false;
@@ -668,26 +687,7 @@ function createGlobalRoomSelector() {
       <span style="font-size: 16px;">${currentRoom.icon}</span>
       <span style="color: ${CONFIG.THEME.text}; font-size: 14px; font-weight: 500;">${currentRoom.name}</span>
     </div>
-    <div class="gemini-room-dropdown-trigger" style="
-      background: ${CONFIG.THEME.primary};
-      color: white;
-      border: none;
-      padding: 6px 10px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 12px;
-      transition: all 0.2s ease;
-    ">Change</div>
-  `;
-
-  // Create dropdown menu
-  const menu = createOptionsPortal(CONFIG.ROOMS, (chosen) => {
-    const room = roomInfo[chosen] || { icon: "💬", name: chosen };
-    selector.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="font-size: 16px;">${room.icon}</span>
-        <span style="color: ${CONFIG.THEME.text}; font-size: 14px; font-weight: 500;">${room.name}</span>
-      </div>
+    <div style="display: flex; gap: 6px; align-items: center;">
       <div class="gemini-room-dropdown-trigger" style="
         background: ${CONFIG.THEME.primary};
         color: white;
@@ -698,6 +698,59 @@ function createGlobalRoomSelector() {
         font-size: 12px;
         transition: all 0.2s ease;
       ">Change</div>
+      <button class="gemini-analytics-btn" style="
+        background: ${CONFIG.THEME.border};
+        color: ${CONFIG.THEME.text};
+        border: none;
+        padding: 6px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+      " title="Analytics & Settings">📊</button>
+    </div>
+  `;
+
+  // Create dropdown menu
+  const menu = createOptionsPortal(CONFIG.ROOMS, (chosen) => {
+    const room = roomInfo[chosen] || { icon: "💬", name: chosen };
+    selector.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 16px;">${room.icon}</span>
+        <span style="color: ${CONFIG.THEME.text}; font-size: 14px; font-weight: 500;">${room.name}</span>
+      </div>
+      <div style="display: flex; gap: 6px; align-items: center;">
+        <div class="gemini-room-dropdown-trigger" style="
+          background: ${CONFIG.THEME.primary};
+          color: white;
+          border: none;
+          padding: 6px 10px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
+          transition: all 0.2s ease;
+        ">Change</div>
+        <button class="gemini-analytics-btn" style="
+          background: ${CONFIG.THEME.border};
+          color: ${CONFIG.THEME.text};
+          border: none;
+          padding: 6px 8px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
+          transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 28px;
+          height: 28px;
+        " title="Analytics & Settings">📊</button>
+      </div>
     `;
     settings.set('selectedRoom', chosen);
     hideMenu();
@@ -742,6 +795,9 @@ function createGlobalRoomSelector() {
   selector.addEventListener('click', (e) => {
     if (e.target.classList.contains('gemini-room-dropdown-trigger')) {
       showMenu();
+    } else if (e.target.classList.contains('gemini-analytics-btn')) {
+      console.log('📊 Discord Analytics & Settings button clicked from room selector');
+      showAnalyticsPanel();
     }
   });
 
@@ -931,15 +987,27 @@ function addReplyButtonToMessage(message) {
   });
 
   genBtn.onclick = async () => {
-    // Check authentication
-    const userData = await chrome.storage.local.get(['geminiUser']);
-    if (!userData.geminiUser) {
-      showNotification("Please login to use AI features", "error");
-      if (window.geminiAuthUI) {
-        window.geminiAuthUI.showAuthModal();
-      } else {
-        showSimpleLoginModal();
+    // Check authentication with better error handling
+    let userData;
+    try {
+      userData = await chrome.storage.local.get(['geminiUser']);
+      console.log('[Gemini Discord] Current user data:', userData);
+      
+      if (!userData.geminiUser) {
+        console.log('[Gemini Discord] No user data found, showing login modal');
+        showNotification("Please login to use AI features", "error");
+        if (window.geminiAuthUI) {
+          window.geminiAuthUI.showAuthModal();
+        } else {
+          showSimpleLoginModal();
+        }
+        return;
       }
+      
+      console.log('[Gemini Discord] User authenticated:', userData.geminiUser.user_mail);
+    } catch (error) {
+      console.error('[Gemini Discord] Error checking authentication:', error);
+      showNotification("Authentication error. Please try again.", "error");
       return;
     }
 
@@ -1037,6 +1105,30 @@ function addReplyButtonToMessage(message) {
     transition: all 0.2s ease;
   `;
   quickBtn.onclick = async () => {
+    // Check authentication
+    let userData;
+    try {
+      userData = await chrome.storage.local.get(['geminiUser']);
+      console.log('[Gemini Discord] Quick generate - Current user data:', userData);
+      
+      if (!userData.geminiUser) {
+        console.log('[Gemini Discord] Quick generate - No user data found, showing login modal');
+        showNotification("Please login to use AI features", "error");
+        if (window.geminiAuthUI) {
+          window.geminiAuthUI.showAuthModal();
+        } else {
+          showSimpleLoginModal();
+        }
+        return;
+      }
+      
+      console.log('[Gemini Discord] Quick generate - User authenticated:', userData.geminiUser.user_mail);
+    } catch (error) {
+      console.error('[Gemini Discord] Quick generate - Error checking authentication:', error);
+      showNotification("Authentication error. Please try again.", "error");
+      return;
+    }
+
     const roomId = getSelectedRoomId();
     if (!roomId) {
       showNotification("Please select a room first", "error");
@@ -1047,7 +1139,7 @@ function addReplyButtonToMessage(message) {
     try {
       const data = await apiClient.request("/generate-quick", {
         method: "POST",
-        body: JSON.stringify({ caption, roomId })
+        body: JSON.stringify({ caption, roomId, userId: userData.geminiUser.user_id })
       });
       
       latestReply = data.reply || "Quick reply generated!";
@@ -1064,21 +1156,7 @@ function addReplyButtonToMessage(message) {
     }
   };
 
-  // ===== Settings Button =====
-  const settingsBtn = document.createElement("button");
-  settingsBtn.innerText = "⚙️ Settings";
-  settingsBtn.style.cssText = `
-    background: ${CONFIG.THEME.secondary};
-    color: ${CONFIG.THEME.text};
-    border: 1px solid ${CONFIG.THEME.border};
-    padding: 6px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-  `;
-  settingsBtn.onclick = () => showSettingsPanel();
+  // Settings button removed - functionality moved to Analytics panel
 
   // ===== Debug Button =====
   const debugBtn = document.createElement("button");
@@ -1098,7 +1176,6 @@ function addReplyButtonToMessage(message) {
 
   row.appendChild(genBtn);
   row.appendChild(quickBtn);
-  row.appendChild(settingsBtn);
   row.appendChild(debugBtn);
   
   wrapper.appendChild(roomDisplay);
@@ -1240,12 +1317,17 @@ function addReplyButtonToMessage(message) {
 
 // === Settings Panel for Discord
 function showSettingsPanel() {
+  console.log('🔧 showSettingsPanel called');
+  
   // Remove existing panel if any
   const existing = document.querySelector('.gemini-settings-panel');
   if (existing) {
+    console.log('🗑️ Removing existing settings panel');
     existing.remove();
     return;
   }
+  
+  console.log('🆕 Creating new settings panel');
 
   const panel = document.createElement('div');
   panel.className = 'gemini-settings-panel';
@@ -1424,7 +1506,257 @@ function showSettingsPanel() {
   document.addEventListener('click', () => panel.remove(), { once: true });
 
   document.body.appendChild(panel);
+  console.log('✅ Settings panel appended to body');
   analytics.track('settings_panel_opened', { platform: 'discord' });
+  console.log('✅ Analytics tracked for settings panel opened');
+}
+
+// === Analytics Panel for Discord
+function showAnalyticsPanel() {
+  console.log('📊 Discord showAnalyticsPanel called');
+  
+  // Remove existing panel if any
+  const existingPanel = document.querySelector('.gemini-analytics-panel');
+  if (existingPanel) {
+    console.log('🗑️ Removing existing Discord analytics panel');
+    existingPanel.remove();
+  }
+  
+  console.log('🆕 Creating new Discord analytics panel');
+
+  const panel = document.createElement('div');
+  panel.className = 'gemini-analytics-panel';
+  panel.style.cssText = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: ${CONFIG.THEME.secondary};
+    border: 1px solid ${CONFIG.THEME.border};
+    border-radius: 12px;
+    padding: 24px;
+    z-index: 2147483647;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    backdrop-filter: blur(10px);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  `;
+
+  const stats = analytics.getStats();
+  
+  panel.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h2 style="margin: 0; color: ${CONFIG.THEME.text}; font-size: 20px;">📊 Analytics & Settings</h2>
+      <button class="close-analytics" style="background: none; border: none; color: ${CONFIG.THEME.text}; font-size: 24px; cursor: pointer;">×</button>
+    </div>
+    
+    <div style="display: grid; gap: 20px;">
+      <!-- Settings Section -->
+      <div class="settings-section">
+        <h3 style="margin: 0 0 12px 0; color: ${CONFIG.THEME.text}; font-size: 16px;">⚙️ Settings</h3>
+        
+        <!-- Authentication -->
+        <div style="margin-bottom: 16px;">
+          <h4 style="color: ${CONFIG.THEME.text}; margin: 0 0 8px 0; font-size: 14px;">🔐 Authentication</h4>
+          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <button id="loginBtn" style="
+              background: ${CONFIG.THEME.primary}; 
+              color: white; 
+              border: none; 
+              padding: 6px 12px; 
+              border-radius: 6px; 
+              cursor: pointer; 
+              font-size: 11px;
+              flex: 1;
+            ">🔑 Login/Register</button>
+            <button id="userInfoBtn" style="
+              background: ${CONFIG.THEME.success}; 
+              color: white; 
+              border: none; 
+              padding: 6px 12px; 
+              border-radius: 6px; 
+              cursor: pointer; 
+              font-size: 11px;
+              flex: 1;
+            ">👤 Account</button>
+          </div>
+        </div>
+        
+        <!-- General Settings -->
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; color: ${CONFIG.THEME.text}; margin-bottom: 8px; font-weight: 500;">
+            <input type="checkbox" id="showPreview" ${settings.get('showPreview') ? 'checked' : ''} style="margin-right: 8px;">
+            Show Reply Preview
+          </label>
+        </div>
+        
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; color: ${CONFIG.THEME.text}; margin-bottom: 8px; font-weight: 500;">
+            <input type="checkbox" id="notifications" ${settings.get('notifications') ? 'checked' : ''} style="margin-right: 8px;">
+            Enable Notifications
+          </label>
+        </div>
+        
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; color: ${CONFIG.THEME.text}; margin-bottom: 8px; font-weight: 500;">
+            <input type="checkbox" id="analytics" ${settings.get('analytics') ? 'checked' : ''} style="margin-right: 8px;">
+            Enable Analytics
+          </label>
+        </div>
+        
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; color: ${CONFIG.THEME.text}; margin-bottom: 8px; font-weight: 500;">
+            <input type="checkbox" id="autoPaste" ${settings.get('autoPaste') ? 'checked' : ''} style="margin-right: 8px;">
+            Auto Paste Replies
+          </label>
+        </div>
+        
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; color: ${CONFIG.THEME.text}; margin-bottom: 8px; font-weight: 500;">
+            Max Messages to Analyze: 
+            <input type="range" id="maxReplies" min="5" max="50" value="${settings.get('maxReplies') || 20}" 
+                   style="margin-left: 8px; width: 100px;">
+            <span id="maxRepliesValue">${settings.get('maxReplies') || 20}</span>
+          </label>
+        </div>
+      </div>
+      
+      <!-- Usage Statistics -->
+      <div class="analytics-section">
+        <h3 style="margin: 0 0 12px 0; color: ${CONFIG.THEME.text}; font-size: 16px;">📈 Usage Statistics</h3>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px;">
+          <div style="background: ${CONFIG.THEME.border}; padding: 12px; border-radius: 8px; text-align: center;">
+            <div style="color: ${CONFIG.THEME.primary}; font-size: 20px; font-weight: bold;">${stats.total}</div>
+            <div style="color: ${CONFIG.THEME.text}; opacity: 0.8;">Total Events</div>
+          </div>
+          <div style="background: ${CONFIG.THEME.border}; padding: 12px; border-radius: 8px; text-align: center;">
+            <div style="color: ${CONFIG.THEME.success}; font-size: 20px; font-weight: bold;">${stats.last24h}</div>
+            <div style="color: ${CONFIG.THEME.text}; opacity: 0.8;">Last 24h</div>
+          </div>
+          <div style="background: ${CONFIG.THEME.border}; padding: 12px; border-radius: 8px; text-align: center;">
+            <div style="color: ${CONFIG.THEME.warning}; font-size: 20px; font-weight: bold;">${stats.last7d}</div>
+            <div style="color: ${CONFIG.THEME.text}; opacity: 0.8;">Last 7d</div>
+          </div>
+          <div style="background: ${CONFIG.THEME.border}; padding: 12px; border-radius: 8px; text-align: center;">
+            <div style="color: ${CONFIG.THEME.error}; font-size: 20px; font-weight: bold;">Discord</div>
+            <div style="color: ${CONFIG.THEME.text}; opacity: 0.8;">Platform</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Event Breakdown -->
+      <div class="analytics-section">
+        <h3 style="margin: 0 0 12px 0; color: ${CONFIG.THEME.text}; font-size: 16px;">🎯 Event Breakdown</h3>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          ${Object.entries(stats.byEvent).map(([event, count]) => `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: ${CONFIG.THEME.border}; border-radius: 6px;">
+              <span style="color: ${CONFIG.THEME.text}; font-size: 13px;">${event}</span>
+              <span style="color: ${CONFIG.THEME.primary}; font-weight: bold;">${count}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      
+      <!-- Room Usage -->
+      <div class="analytics-section">
+        <h3 style="margin: 0 0 12px 0; color: ${CONFIG.THEME.text}; font-size: 16px;">🏠 Room Usage</h3>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          ${Object.entries(stats.byRoom).map(([room, count]) => `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: ${CONFIG.THEME.border}; border-radius: 6px;">
+              <span style="color: ${CONFIG.THEME.text}; font-size: 13px;">${room}</span>
+              <span style="color: ${CONFIG.THEME.success}; font-weight: bold;">${count}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+    
+    <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+      <button class="export-analytics" style="background: ${CONFIG.THEME.primary}; color: white; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px;">📤 Export Data</button>
+      <button class="close-analytics" style="background: ${CONFIG.THEME.border}; color: ${CONFIG.THEME.text}; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px;">Close</button>
+    </div>
+  `;
+
+  // Event listeners
+  panel.querySelector('.close-analytics').onclick = () => panel.remove();
+  
+  // Settings event listeners
+  panel.querySelector('#showPreview').onchange = (e) => {
+    settings.set('showPreview', e.target.checked);
+  };
+  
+  panel.querySelector('#notifications').onchange = (e) => {
+    settings.set('notifications', e.target.checked);
+  };
+  
+  panel.querySelector('#analytics').onchange = (e) => {
+    settings.set('analytics', e.target.checked);
+  };
+  
+  panel.querySelector('#autoPaste').onchange = (e) => {
+    settings.set('autoPaste', e.target.checked);
+  };
+  
+  panel.querySelector('#maxReplies').oninput = (e) => {
+    const value = parseInt(e.target.value);
+    settings.set('maxReplies', value);
+    panel.querySelector('#maxRepliesValue').textContent = value;
+  };
+  
+  // Authentication buttons
+  panel.querySelector('#loginBtn').onclick = () => {
+    panel.remove();
+    if (window.geminiAuthUI) {
+      window.geminiAuthUI.showAuthModal();
+    } else {
+      // Fallback: show simple login modal
+      showSimpleLoginModal();
+    }
+  };
+  
+  panel.querySelector('#userInfoBtn').onclick = () => {
+    panel.remove();
+    if (window.geminiAuthUI) {
+      window.geminiAuthUI.showUserInfo();
+    } else {
+      showNotification("Please login first using the Login/Register button.", "error");
+    }
+  };
+  
+  panel.querySelector('.export-analytics').onclick = () => {
+    const data = {
+      settings: settings.settings,
+      analytics: analytics.events,
+      stats: stats,
+      exportDate: new Date().toISOString()
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `gemini-discord-analytics-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    showNotification("Analytics data exported!", "success");
+  };
+
+  document.body.appendChild(panel);
+  console.log('✅ Discord Analytics panel appended to body');
+  
+  // Close on escape
+  const handleEscape = (e) => {
+    if (e.key === 'Escape') {
+      panel.remove();
+      document.removeEventListener('keydown', handleEscape);
+    }
+  };
+  document.addEventListener('keydown', handleEscape);
 }
 
 // === Debug Message Detection for Discord
@@ -1678,6 +2010,14 @@ const composerObserver = new MutationObserver(() => {
   try { injectComposerToolbar(); } catch (_) {}
 });
 composerObserver.observe(document.body, { childList: true, subtree: true });
+
+// Listen for authentication messages from popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'USER_LOGGED_IN') {
+    console.log('[Gemini Discord] User logged in:', message.user);
+    showNotification(`Welcome ${message.user.user_mail}! You have ${message.user.user_token.toLocaleString()} tokens.`, 'success');
+  }
+});
 
 // Initialize extension
 setTimeout(() => {

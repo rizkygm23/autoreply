@@ -146,7 +146,13 @@ function estimateRequestTokens(prompt, roomData, userRoom) {
 // === User Management ===
 async function createUser(email, password, roomData = {}) {
   try {
-    const defaultRooms = ["rialo", "lighter", "mmt", "cys", "mega", "fgo", "town"];
+    const defaultRooms = [
+      "rialo",
+      "lighter",
+      "creek",
+      "cys",
+      "town"
+    ];
     const defaultRoomData = {};
     
     // Load room data from files

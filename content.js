@@ -402,6 +402,12 @@ async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = tru
     
     const komentar = await getTweetReplies(tweet);
 
+    // Get user data for userId
+    const userData = await chrome.storage.local.get(['geminiUser']);
+    if (!userData.geminiUser) {
+      throw new Error('User not authenticated');
+    }
+
     // Use direct API request with userId
     const response = await fetch(`${CONFIG.API_BASE_URL}/generate`, {
       method: "POST",
@@ -747,8 +753,8 @@ function showSimpleLoginModal() {
 
   modal.innerHTML = `
     <div style="
-      background: #1a1a1a;
-      border: 1px solid #333;
+      background: #15202b;
+      border: 1px solid #2f3336;
       border-radius: 12px;
       padding: 24px;
       max-width: 400px;
@@ -851,30 +857,49 @@ function showSimpleLoginModal() {
     loginBtn.disabled = true;
 
     try {
+      console.log('[Gemini] Attempting login for:', email);
       const response = await fetch('https://autoreply-gt64.onrender.com/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
       
-      const data = await response.json();
+      console.log('[Gemini] Login response status:', response.status);
       
       if (response.ok) {
-        // Store user data
-        await chrome.storage.local.set({ geminiUser: data.user });
-        modal.remove();
-        showNotification('Login successful! Welcome to Gemini Auto Reply!', 'success');
+        const data = await response.json();
+        console.log('[Gemini] Login response data:', data);
         
-        // Retry the original action
-        if (originalAction) {
-          originalAction();
+        if (data.user) {
+          // Store user data
+          await chrome.storage.local.set({ geminiUser: data.user });
+          console.log('[Gemini] User data stored:', data.user);
+          modal.remove();
+          showNotification('Login successful! Welcome to Gemini Auto Reply!', 'success');
+          
+          // Notify content scripts about login
+          chrome.runtime.sendMessage({ type: 'USER_LOGGED_IN', user: data.user });
+          
+          // Retry the original action
+          if (originalAction) {
+            originalAction();
+          }
+        } else {
+          console.error('[Gemini] No user data in response:', data);
+          alert('Login failed. Invalid response from server.');
         }
       } else {
-        alert(data.error || 'Login failed');
+        const errorData = await response.json();
+        console.error('[Gemini] Login failed:', errorData);
+        alert(errorData.error || 'Login failed. Please check your credentials.');
       }
     } catch (error) {
-      console.error('Login error:', error);
-      alert('Login failed. Please try again.');
+      console.error('[Gemini] Login error:', error);
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        alert('Login failed. Please check your internet connection and try again.');
+      } else {
+        alert('Login failed. Please try again.');
+      }
     } finally {
       loginBtn.textContent = originalText;
       loginBtn.disabled = false;
@@ -902,40 +927,67 @@ function showSimpleLoginModal() {
     registerBtn.disabled = true;
 
     try {
+      console.log('[Gemini] Attempting registration for:', email);
       const response = await fetch('https://autoreply-gt64.onrender.com/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
       
-      const data = await response.json();
+      console.log('[Gemini] Register response status:', response.status);
       
       if (response.ok) {
-        // Store user data
-        await chrome.storage.local.set({ geminiUser: data.user });
-        modal.remove();
-        showNotification('Registration successful! Welcome to Gemini Auto Reply!', 'success');
+        const data = await response.json();
+        console.log('[Gemini] Register response data:', data);
         
-        // Retry the original action
-        if (originalAction) {
-          originalAction();
-        }
-      } else if (data.user) {
-        // User exists, login instead
-        await chrome.storage.local.set({ geminiUser: data.user });
-        modal.remove();
-        showNotification('User already exists! Logged in successfully.', 'success');
-        
-        // Retry the original action
-        if (originalAction) {
-          originalAction();
+        if (data.user) {
+          // Store user data
+          await chrome.storage.local.set({ geminiUser: data.user });
+          console.log('[Gemini] User data stored:', data.user);
+          modal.remove();
+          showNotification('Registration successful! Welcome to Gemini Auto Reply!', 'success');
+          
+          // Notify content scripts about login
+          chrome.runtime.sendMessage({ type: 'USER_LOGGED_IN', user: data.user });
+          
+          // Retry the original action
+          if (originalAction) {
+            originalAction();
+          }
+        } else {
+          console.error('[Gemini] No user data in response:', data);
+          alert('Registration failed. Invalid response from server.');
         }
       } else {
-        alert(data.error || 'Registration failed');
+        const errorData = await response.json();
+        console.log('[Gemini] Register response data:', errorData);
+        
+        if (errorData.user) {
+          // User exists, login instead
+          await chrome.storage.local.set({ geminiUser: errorData.user });
+          console.log('[Gemini] User already exists, logged in:', errorData.user);
+          modal.remove();
+          showNotification('User already exists! Logged in successfully.', 'success');
+          
+          // Notify content scripts about login
+          chrome.runtime.sendMessage({ type: 'USER_LOGGED_IN', user: errorData.user });
+          
+          // Retry the original action
+          if (originalAction) {
+            originalAction();
+          }
+        } else {
+          console.error('[Gemini] Registration failed:', errorData);
+          alert(errorData.error || 'Registration failed. Please try again.');
+        }
       }
     } catch (error) {
-      console.error('Registration error:', error);
-      alert('Registration failed. Please try again.');
+      console.error('[Gemini] Registration error:', error);
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        alert('Registration failed. Please check your internet connection and try again.');
+      } else {
+        alert('Registration failed. Please try again.');
+      }
     } finally {
       registerBtn.textContent = originalText;
       registerBtn.disabled = false;
@@ -1201,16 +1253,48 @@ function createGlobalRoomSelector() {
       <span style="font-size: 16px;">${currentRoom.icon}</span>
       <span style="color: ${CONFIG.THEME.text}; font-size: 14px; font-weight: 500;">${currentRoom.name}</span>
     </div>
-    <div class="gemini-room-dropdown-trigger" style="
-      background: ${CONFIG.THEME.primary};
-      color: white;
-      border: none;
-      padding: 6px 10px;
-      border-radius: 6px;
+    <div style="display: flex; gap: 6px; align-items: center;">
+      <div class="gemini-room-dropdown-trigger" style="
+        background: ${CONFIG.THEME.primary};
+        color: white;
+        border: none;
+        padding: 6px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+    font-size: 12px;
+        transition: all 0.2s ease;
+      ">Change</div>
+      <button class="gemini-settings-btn" style="
+        background: ${CONFIG.THEME.border};
+        color: ${CONFIG.THEME.text};
+        border: none;
+        padding: 6px 8px;
+        border-radius: 6px;
     cursor: pointer;
-      font-size: 12px;
-      transition: all 0.2s ease;
-    ">Change</div>
+        font-size: 12px;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+      " title="Settings">⚙️</button>
+      <button class="gemini-analytics-btn" style="
+        background: ${CONFIG.THEME.border};
+        color: ${CONFIG.THEME.text};
+        border: none;
+        padding: 6px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+      " title="Analytics">📊</button>
+    </div>
   `;
 
   // Create dropdown menu
@@ -1221,16 +1305,48 @@ function createGlobalRoomSelector() {
         <span style="font-size: 16px;">${room.icon}</span>
         <span style="color: ${CONFIG.THEME.text}; font-size: 14px; font-weight: 500;">${room.name}</span>
       </div>
-      <div class="gemini-room-dropdown-trigger" style="
-        background: ${CONFIG.THEME.primary};
-        color: white;
-        border: none;
-        padding: 6px 10px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 12px;
-        transition: all 0.2s ease;
-      ">Change</div>
+      <div style="display: flex; gap: 6px; align-items: center;">
+        <div class="gemini-room-dropdown-trigger" style="
+          background: ${CONFIG.THEME.primary};
+          color: white;
+          border: none;
+          padding: 6px 10px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
+          transition: all 0.2s ease;
+        ">Change</div>
+        <button class="gemini-settings-btn" style="
+          background: ${CONFIG.THEME.border};
+          color: ${CONFIG.THEME.text};
+          border: none;
+          padding: 6px 8px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
+          transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 28px;
+          height: 28px;
+        " title="Settings">⚙️</button>
+        <button class="gemini-analytics-btn" style="
+          background: ${CONFIG.THEME.border};
+          color: ${CONFIG.THEME.text};
+          border: none;
+          padding: 6px 8px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
+          transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 28px;
+          height: 28px;
+        " title="Analytics">📊</button>
+      </div>
     `;
     settings.set('selectedRoom', chosen);
     hideMenu();
@@ -1275,6 +1391,12 @@ function createGlobalRoomSelector() {
   selector.addEventListener('click', (e) => {
     if (e.target.classList.contains('gemini-room-dropdown-trigger')) {
     showMenu();
+    } else if (e.target.classList.contains('gemini-settings-btn')) {
+      console.log('⚙️ Twitter Settings button clicked from room selector');
+      showSettingsPanel();
+    } else if (e.target.classList.contains('gemini-analytics-btn')) {
+      console.log('📊 Twitter Analytics button clicked from room selector');
+      showAnalyticsPanel();
     }
   });
 
@@ -1305,15 +1427,16 @@ function updateAllTweetInterfaces() {
   const wrappers = document.querySelectorAll('.gemini-reply-wrapper');
   wrappers.forEach(wrapper => {
     const currentRoom = settings.get('selectedRoom') || CONFIG.ROOMS[0];
-    const roomInfo = {
-      rialo: { icon: "🏛️", name: "Rialo" },
-      lighter: { icon: "💡", name: "Lighter" },
-      mmt: { icon: "🚀", name: "MMT" },
-      cys: { icon: "🎯", name: "Cysic" },
-      mega: { icon: "⚡", name: "Mega" },
-      fgo: { icon: "🎮", name: "FGO" },
-      town: { icon: "🏘️", name: "Town" }
-    };
+    // Room info mapping
+  const roomInfo = {
+    rialo: { icon: "🏛️", name: "Rialo" },
+    lighter: { icon: "💡", name: "Lighter" },
+    mmt: { icon: "🚀", name: "MMT" },
+    cys: { icon: "🎯", name: "Cysic" },
+    mega: { icon: "⚡", name: "Mega" },
+    fgo: { icon: "🎮", name: "FGO" },
+    town: { icon: "🏘️", name: "Town" }
+  };
     
     const room = roomInfo[currentRoom] || { icon: "💬", name: currentRoom };
     
@@ -1358,7 +1481,7 @@ function addReplyButtonToTweet(tweet) {
     pointer-events: auto;
   `;
 
-  // Current room display (read-only)
+  // Room info mapping
   const roomInfo = {
     rialo: { icon: "🏛️", name: "Rialo" },
     lighter: { icon: "💡", name: "Lighter" },
@@ -1436,15 +1559,26 @@ function addReplyButtonToTweet(tweet) {
     e.stopPropagation();
     console.log("[Gemini] Generate button clicked!");
     
-    // Check authentication
-    const userData = await chrome.storage.local.get(['geminiUser']);
-    if (!userData.geminiUser) {
-      showNotification("Please login to use AI features", "error");
-      if (window.geminiAuthUI) {
-        window.geminiAuthUI.showAuthModal();
-      } else {
-        showSimpleLoginModal();
+    // Check authentication with better error handling
+    try {
+      const userData = await chrome.storage.local.get(['geminiUser']);
+      console.log('[Gemini] Current user data:', userData);
+      
+      if (!userData.geminiUser) {
+        console.log('[Gemini] No user data found, showing login modal');
+        showNotification("Please login to use AI features", "error");
+        if (window.geminiAuthUI) {
+          window.geminiAuthUI.showAuthModal();
+        } else {
+          showSimpleLoginModal();
+        }
+        return;
       }
+      
+      console.log('[Gemini] User authenticated:', userData.geminiUser.user_mail);
+    } catch (error) {
+      console.error('[Gemini] Error checking authentication:', error);
+      showNotification("Authentication error. Please try again.", "error");
       return;
     }
     
@@ -1508,10 +1642,43 @@ function addReplyButtonToTweet(tweet) {
     display: flex;
     align-items: center;
     justify-content: center;
+    z-index: 10000;
+    position: relative;
   `;
 
-  settingsBtn.addEventListener("click", () => {
-    showSettingsPanel();
+  // Enhanced click handler with debug
+  settingsBtn.addEventListener("click", (e) => {
+    console.log('🔍 Twitter Settings button click event triggered');
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('⚙️ Twitter Settings button clicked - calling showSettingsPanel');
+    try {
+      showSettingsPanel();
+      console.log('✅ showSettingsPanel called successfully');
+    } catch (error) {
+      console.error('❌ Error calling showSettingsPanel:', error);
+    }
+  });
+  
+  // Add mousedown event as backup
+  settingsBtn.addEventListener('mousedown', (e) => {
+    console.log('🔍 Twitter Settings button mousedown event');
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  
+  // Add mouseup event as backup
+  settingsBtn.addEventListener('mouseup', (e) => {
+    console.log('🔍 Twitter Settings button mouseup event');
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('⚙️ Twitter Settings button mouseup - calling showSettingsPanel');
+    try {
+      showSettingsPanel();
+      console.log('✅ showSettingsPanel called successfully from mouseup');
+    } catch (error) {
+      console.error('❌ Error calling showSettingsPanel from mouseup:', error);
+    }
   });
 
   // Debug Button (only show in development)
@@ -1576,9 +1743,16 @@ function addReplyButtonToTweet(tweet) {
 
 // === Settings Panel
 function showSettingsPanel() {
+  console.log('🔧 Twitter showSettingsPanel called');
+  
   // Remove existing settings panel
   const existingPanel = document.querySelector('.gemini-settings-panel');
-  if (existingPanel) existingPanel.remove();
+  if (existingPanel) {
+    console.log('🗑️ Removing existing Twitter settings panel');
+    existingPanel.remove();
+  }
+  
+  console.log('🆕 Creating new Twitter settings panel');
 
   const panel = document.createElement('div');
   panel.className = 'gemini-settings-panel';
@@ -1773,6 +1947,141 @@ function showSettingsPanel() {
   };
 
   document.body.appendChild(panel);
+  console.log('✅ Twitter Settings panel appended to body');
+  
+  // Close on escape
+  const handleEscape = (e) => {
+    if (e.key === 'Escape') {
+      panel.remove();
+      document.removeEventListener('keydown', handleEscape);
+    }
+  };
+  document.addEventListener('keydown', handleEscape);
+}
+
+// === Analytics Panel for Twitter
+function showAnalyticsPanel() {
+  console.log('📊 Twitter showAnalyticsPanel called');
+  
+  // Remove existing panel if any
+  const existingPanel = document.querySelector('.gemini-analytics-panel');
+  if (existingPanel) {
+    console.log('🗑️ Removing existing Twitter analytics panel');
+    existingPanel.remove();
+  }
+  
+  console.log('🆕 Creating new Twitter analytics panel');
+
+  const panel = document.createElement('div');
+  panel.className = 'gemini-analytics-panel';
+  panel.style.cssText = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: ${CONFIG.THEME.secondary};
+    border: 1px solid ${CONFIG.THEME.border};
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    z-index: 2147483647;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.7);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  `;
+
+  const stats = analytics.getStats();
+  
+  panel.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h2 style="margin: 0; color: ${CONFIG.THEME.text}; font-size: 20px;">📊 Analytics</h2>
+      <button class="close-analytics" style="background: none; border: none; color: ${CONFIG.THEME.text}; font-size: 24px; cursor: pointer;">×</button>
+    </div>
+    
+    <div style="display: grid; gap: 20px;">
+      <!-- Usage Statistics -->
+      <div class="analytics-section">
+        <h3 style="margin: 0 0 12px 0; color: ${CONFIG.THEME.text}; font-size: 16px;">📈 Usage Statistics</h3>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px;">
+          <div style="background: ${CONFIG.THEME.border}; padding: 12px; border-radius: 8px; text-align: center;">
+            <div style="color: ${CONFIG.THEME.primary}; font-size: 20px; font-weight: bold;">${stats.total}</div>
+            <div style="color: ${CONFIG.THEME.text}; opacity: 0.8;">Total Events</div>
+          </div>
+          <div style="background: ${CONFIG.THEME.border}; padding: 12px; border-radius: 8px; text-align: center;">
+            <div style="color: ${CONFIG.THEME.success}; font-size: 20px; font-weight: bold;">${stats.last24h}</div>
+            <div style="color: ${CONFIG.THEME.text}; opacity: 0.8;">Last 24h</div>
+          </div>
+          <div style="background: ${CONFIG.THEME.border}; padding: 12px; border-radius: 8px; text-align: center;">
+            <div style="color: ${CONFIG.THEME.warning}; font-size: 20px; font-weight: bold;">${stats.last7d}</div>
+            <div style="color: ${CONFIG.THEME.text}; opacity: 0.8;">Last 7d</div>
+          </div>
+          <div style="background: ${CONFIG.THEME.border}; padding: 12px; border-radius: 8px; text-align: center;">
+            <div style="color: ${CONFIG.THEME.error}; font-size: 20px; font-weight: bold;">Twitter</div>
+            <div style="color: ${CONFIG.THEME.text}; opacity: 0.8;">Platform</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Event Breakdown -->
+      <div class="analytics-section">
+        <h3 style="margin: 0 0 12px 0; color: ${CONFIG.THEME.text}; font-size: 16px;">🎯 Event Breakdown</h3>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          ${Object.entries(stats.byEvent).map(([event, count]) => `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: ${CONFIG.THEME.border}; border-radius: 6px;">
+              <span style="color: ${CONFIG.THEME.text}; font-size: 13px;">${event}</span>
+              <span style="color: ${CONFIG.THEME.primary}; font-weight: bold;">${count}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      
+      <!-- Room Usage -->
+      <div class="analytics-section">
+        <h3 style="margin: 0 0 12px 0; color: ${CONFIG.THEME.text}; font-size: 16px;">🏠 Room Usage</h3>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          ${Object.entries(stats.byRoom).map(([room, count]) => `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: ${CONFIG.THEME.border}; border-radius: 6px;">
+              <span style="color: ${CONFIG.THEME.text}; font-size: 13px;">${room}</span>
+              <span style="color: ${CONFIG.THEME.success}; font-weight: bold;">${count}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+    
+    <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+      <button class="export-analytics" style="background: ${CONFIG.THEME.primary}; color: white; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px;">📤 Export Data</button>
+      <button class="close-analytics" style="background: ${CONFIG.THEME.border}; color: ${CONFIG.THEME.text}; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px;">Close</button>
+    </div>
+  `;
+
+  // Event listeners
+  panel.querySelector('.close-analytics').onclick = () => panel.remove();
+  
+  panel.querySelector('.export-analytics').onclick = () => {
+    const data = {
+      settings: settings.settings,
+      analytics: analytics.events,
+      stats: stats,
+      exportDate: new Date().toISOString()
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `gemini-twitter-analytics-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    showNotification("Analytics data exported!", "success");
+  };
+
+  document.body.appendChild(panel);
+  console.log('✅ Twitter Analytics panel appended to body');
   
   // Close on escape
   const handleEscape = (e) => {
@@ -1858,6 +2167,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     showNotification(`Welcome ${message.user.user_mail}! You have ${message.user.user_token.toLocaleString()} tokens.`, 'success');
   }
 });
+
+// Check login status on initialization
+async function checkLoginStatus() {
+  try {
+    const userData = await chrome.storage.local.get(['geminiUser']);
+    if (userData.geminiUser) {
+      console.log('[Gemini] User already logged in:', userData.geminiUser);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('[Gemini] Error checking login status:', error);
+    return false;
+  }
+}
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
