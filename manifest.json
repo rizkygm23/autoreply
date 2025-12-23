@@ -38,7 +38,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["icon.png", "auth-helper.js"],
+      "resources": ["icon.png", "auth-helper.js", "project.json"],
       "use_dynamic_url": true
     }
   ],

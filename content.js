@@ -13,9 +13,9 @@ document.head.appendChild(authScript);
 
 // === Enhanced Configuration
 const CONFIG = {
-  ROOMS: ["rialo", "lighter", "mmt", "cys", "mega", "fgo", "town"],
+  ROOMS: [], // Will be loaded from project.json
   MAX_REPLIES: 20,
-  API_BASE_URL: "https://autoreply-gt64.onrender.com",
+  API_BASE_URL: "http://localhost:3000",
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
   THEME: {
@@ -29,6 +29,90 @@ const CONFIG = {
     warning: "#ffd400"
   }
 };
+
+// Project data loaded from project.json
+let projectData = null;
+let roomInfoMap = {};
+
+// Embedded fallback data (from project.json)
+const FALLBACK_PROJECT_DATA = {
+  "rooms": [
+    { "id": "rialo", "icon": "🏛️", "name": "Rialo", "desc": "Rialo Community" },
+    { "id": "lighter", "icon": "💡", "name": "Lighter", "desc": "Lighter Community" },
+    { "id": "creek", "icon": "🌊", "name": "Creek", "desc": "Creek Community" },
+    { "id": "cys", "icon": "🎯", "name": "Cysic", "desc": "Cysic Community" },
+    { "id": "town", "icon": "🏘️", "name": "Town", "desc": "Town Community" },
+    { "id": "fgo", "icon": "🎮", "name": "FGO", "desc": "FGO Community" },
+    { "id": "mmt", "icon": "🚀", "name": "MMT", "desc": "MMT Community" },
+    { "id": "mega", "icon": "⚡", "name": "Mega", "desc": "Mega Community" },
+    { "id": "seismic", "icon": "🌍", "name": "Seismic", "desc": "Seismic Community" }
+  ]
+};
+
+// Process project data into CONFIG.ROOMS and roomInfoMap
+function processProjectData(data) {
+  if (data.rooms && Array.isArray(data.rooms)) {
+    CONFIG.ROOMS = data.rooms.map(room => room.id);
+    
+    // Build roomInfoMap for quick lookup
+    roomInfoMap = {};
+    data.rooms.forEach(room => {
+      roomInfoMap[room.id] = {
+        icon: room.icon || "💬",
+        name: room.name || room.id,
+        desc: room.desc || `${room.name || room.id} Community`
+      };
+    });
+    
+    console.log('[Gemini Twitter] Loaded', CONFIG.ROOMS.length, 'rooms:', CONFIG.ROOMS);
+    return true;
+  }
+  return false;
+}
+
+// Load project.json data
+async function loadProjectData() {
+  try {
+    const url = chrome.runtime.getURL('project.json');
+    console.log('[Gemini Twitter] Attempting to load project.json from:', url);
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    projectData = await response.json();
+    
+    if (processProjectData(projectData)) {
+      console.log('[Gemini Twitter] ✅ Successfully loaded project.json');
+      return;
+    } else {
+      throw new Error('Invalid project.json structure');
+    }
+  } catch (error) {
+    console.warn('[Gemini Twitter] ⚠️ Failed to load project.json:', error.message);
+    console.log('[Gemini Twitter] Using embedded fallback data');
+    
+    // Use embedded fallback data
+    projectData = FALLBACK_PROJECT_DATA;
+    processProjectData(projectData);
+  }
+}
+
+// Dynamically supplied rooms from user.profile (Supabase JSONB `user_room`)
+// Will be populated by `initRoomsFromUser()`; fallback to CONFIG.ROOMS
+let dynamicRooms = null;
+
+function getAvailableRooms() {
+  return Array.isArray(dynamicRooms) && dynamicRooms.length > 0 ? dynamicRooms : CONFIG.ROOMS;
+}
+
+// Get room info from project.json data
+function getRoomInfo(roomId) {
+  return roomInfoMap[roomId] || { icon: "💬", name: roomId, desc: `${roomId} Community` };
+}
+
+async function initRoomsFromUser() {}
 
 // === Enhanced Storage & Settings
 class ExtensionSettings {
@@ -402,13 +486,7 @@ async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = tru
     
     const komentar = await getTweetReplies(tweet);
 
-    // Get user data for userId
-    const userData = await chrome.storage.local.get(['geminiUser']);
-    if (!userData.geminiUser) {
-      throw new Error('User not authenticated');
-    }
-
-    // Use direct API request with userId
+    // Send to local API without authentication
     const response = await fetch(`${CONFIG.API_BASE_URL}/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -416,7 +494,6 @@ async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = tru
         caption: tweetText,
         roomId,
         komentar,
-        userId: userData.geminiUser.user_id,
         options: {
           showPreview: settings.get('showPreview'),
           maxLength: 280,
@@ -429,18 +506,7 @@ async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = tru
 
     if (!response.ok) {
       const errorData = data;
-      if (response.status === 402) {
-        // Insufficient tokens
-        showNotification(`Insufficient tokens! You have ${errorData.currentTokens} tokens, need ${errorData.requiredTokens}. Please top up your account.`, "error");
-        window.geminiAuthUI.showUserInfo();
-        return;
-      } else if (response.status === 404) {
-        showNotification("User not found. Please login again.", "error");
-        window.geminiAuthUI.showAuthModal();
-        return;
-      } else {
-        throw new Error(errorData.error || 'Request failed');
-      }
+      throw new Error(errorData.error || 'Request failed');
     }
 
     const reply = data.reply || "Gagal generate 😅";
@@ -451,9 +517,7 @@ async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = tru
       roomId, 
       generationTime,
       replyLength: reply.length,
-      alternativesCount: alternatives.length,
-      tokensUsed: data.tokensUsed,
-      remainingTokens: data.remainingTokens
+      alternativesCount: alternatives.length
     });
 
     if (showPreview && settings.get('showPreview')) {
@@ -465,9 +529,8 @@ async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = tru
     btn.innerText = "✅ Done!";
     btn.style.background = CONFIG.THEME.success;
     
-    // Show success notification with token info
     if (settings.get('notifications')) {
-      showNotification(`Reply generated! Used ${data.tokensUsed} tokens. ${data.remainingTokens} remaining.`, "success");
+      showNotification("Reply generated!", "success");
     }
 
   } catch (error) {
@@ -495,8 +558,96 @@ async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = tru
   }
 }
 
+// === Generate Quote Retweet Function
+async function handleGenerateQuote({ tweet, tweetText, roomId, btn, showPreview = true }) {
+  const originalText = btn.innerText;
+  const startTime = Date.now();
+  
+  // Enhanced button states
+  btn.innerText = "⏳ Generating...";
+  btn.disabled = true;
+  btn.style.opacity = "0.7";
+  btn.style.cursor = "not-allowed";
+
+  try {
+    analytics.track('generate_quote_start', { roomId, tweetLength: tweetText.length });
+    
+    const komentar = await getTweetReplies(tweet);
+
+    // Send to local API for quote retweet
+    const response = await fetch(`${CONFIG.API_BASE_URL}/generate-quote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        caption: tweetText,
+        roomId,
+        komentar,
+        options: {
+          showPreview: settings.get('showPreview'),
+          maxLength: 280,
+          includeEmojis: true
+        }
+      })
+    });
+    
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errorData = data;
+      throw new Error(errorData.error || 'Request failed');
+    }
+
+    const quote = data.reply || "Gagal generate quote 😅";
+    const alternatives = data.alternatives || [];
+    const generationTime = Date.now() - startTime;
+
+    analytics.track('generate_quote_success', { 
+      roomId, 
+      generationTime,
+      quoteLength: quote.length,
+      alternativesCount: alternatives.length
+    });
+
+    if (showPreview && settings.get('showPreview')) {
+      showReplyPreview(tweet, quote, alternatives, roomId, true);
+    } else {
+      insertQuoteDirectly(tweet, quote);
+    }
+
+    btn.innerText = "✅ Done!";
+    btn.style.background = CONFIG.THEME.success;
+    
+    if (settings.get('notifications')) {
+      showNotification("Quote retweet generated!", "success");
+    }
+
+  } catch (error) {
+    console.error("Gagal generate quote retweet:", error);
+    btn.innerText = "❌ Error";
+    btn.style.background = CONFIG.THEME.error;
+    
+    analytics.track('generate_quote_error', { 
+      roomId, 
+      error: error.message,
+      generationTime: Date.now() - startTime
+    });
+
+    if (settings.get('notifications')) {
+      showNotification("Failed to generate quote retweet. Please try again.", "error");
+    }
+  } finally {
+    setTimeout(() => {
+      btn.innerText = originalText;
+      btn.disabled = false;
+      btn.style.opacity = "1";
+      btn.style.cursor = "pointer";
+      btn.style.background = "#00ba7c";
+    }, 2000);
+  }
+}
+
 // === Enhanced Reply Preview Modal
-function showReplyPreview(tweet, reply, alternatives = [], roomId) {
+function showReplyPreview(tweet, reply, alternatives = [], roomId, isQuote = false) {
   // Remove existing preview if any
   const existingPreview = document.querySelector('.gemini-reply-preview');
   if (existingPreview) existingPreview.remove();
@@ -521,7 +672,7 @@ function showReplyPreview(tweet, reply, alternatives = [], roomId) {
 
   preview.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-      <h3 style="margin: 0; color: ${CONFIG.THEME.text}; font-size: 16px;">💬 Generated Reply</h3>
+      <h3 style="margin: 0; color: ${CONFIG.THEME.text}; font-size: 16px;">${isQuote ? '🔁 Generated Quote Retweet' : '💬 Generated Reply'}</h3>
       <button class="close-preview" style="background: none; border: none; color: ${CONFIG.THEME.text}; font-size: 20px; cursor: pointer;">×</button>
     </div>
     
@@ -554,7 +705,11 @@ function showReplyPreview(tweet, reply, alternatives = [], roomId) {
   preview.querySelector('.cancel-preview').onclick = () => preview.remove();
   
   preview.querySelector('.use-reply').onclick = () => {
-    insertReplyDirectly(tweet, reply);
+    if (isQuote) {
+      insertQuoteDirectly(tweet, reply);
+    } else {
+      insertReplyDirectly(tweet, reply);
+    }
     preview.remove();
   };
   
@@ -593,6 +748,41 @@ function showReplyPreview(tweet, reply, alternatives = [], roomId) {
     }
   };
   document.addEventListener('keydown', handleEscape);
+}
+
+// === Helper function to get text from Twitter reply input field
+function getTwitterReplyInputText() {
+  // Try multiple selectors to find the active reply input field
+  const selectors = [
+    'div[data-testid="tweetTextarea_0"]',
+    'div[role="textbox"][data-testid="tweetTextarea_0"]',
+    'div[role="textbox"]',
+    '[data-testid="tweetTextarea_0"]',
+    'div[contenteditable="true"][role="textbox"]'
+  ];
+  
+  for (const selector of selectors) {
+    const input = document.querySelector(selector);
+    if (input) {
+      const text = input.innerText || input.textContent || '';
+      if (text.trim()) {
+        return text.trim();
+      }
+    }
+  }
+  
+  // Fallback: try to find any visible textbox
+  const allTextboxes = document.querySelectorAll('div[role="textbox"]');
+  for (const textbox of allTextboxes) {
+    if (textbox.offsetParent !== null) { // Check if visible
+      const text = textbox.innerText || textbox.textContent || '';
+      if (text.trim()) {
+        return text.trim();
+      }
+    }
+  }
+  
+  return '';
 }
 
 // === Smart Reply Insertion (Copy or Auto-Paste based on settings)
@@ -666,6 +856,104 @@ async function insertReplyDirectly(tweet, reply) {
     showReplyModal(reply);
     
     analytics.track('reply_copy_failed', { 
+      error: error.message,
+      fallbackUsed: true 
+    });
+  }
+}
+
+// === Smart Quote Retweet Insertion
+async function insertQuoteDirectly(tweet, quote) {
+  const autoPaste = settings.get('autoPaste');
+  const openComposer = settings.get('openComposer');
+  
+  try {
+    // Always copy to clipboard first
+    await navigator.clipboard.writeText(quote);
+    
+    // Open quote retweet composer if enabled
+    if (openComposer) {
+      // Try to find quote retweet button (usually near reply button)
+      const quoteBtn = tweet.querySelector('[data-testid="retweet"]') || 
+                       tweet.querySelector('[aria-label*="Repost"]') ||
+                       tweet.querySelector('button[aria-label*="retweet"]');
+      
+      if (quoteBtn) {
+        quoteBtn.click();
+        
+        // Wait a bit for the modal to open, then click "Quote" option
+        setTimeout(() => {
+          const quoteOption = document.querySelector('[data-testid="Dropdown"] [role="menuitem"]') ||
+                              Array.from(document.querySelectorAll('div[role="menuitem"]')).find(el => 
+                                el.textContent.includes('Quote') || el.textContent.includes('Quote post')
+                              );
+          
+          if (quoteOption) {
+            quoteOption.click();
+            
+            // Auto-paste if enabled
+            if (autoPaste) {
+              setTimeout(() => {
+                const input = document.querySelector('div[role="textbox"]');
+                if (input) {
+                  input.focus();
+                  input.innerText = quote;
+                  
+                  // Trigger input event for Twitter's character counter
+                  const event = new Event('input', { bubbles: true });
+                  input.dispatchEvent(event);
+                }
+              }, 600);
+              
+              if (settings.get('notifications')) {
+                showNotification("Quote retweet pasted automatically!", "success");
+              }
+              
+              analytics.track('quote_auto_pasted', { 
+                quoteLength: quote.length,
+                autoPaste: true 
+              });
+            } else {
+              if (settings.get('notifications')) {
+                showNotification("Quote retweet copied to clipboard! Paste it manually.", "success");
+              }
+              
+              analytics.track('quote_copied', { 
+                quoteLength: quote.length,
+                autoPaste: false 
+              });
+            }
+          } else {
+            // If no quote option found, just copy to clipboard
+            if (settings.get('notifications')) {
+              showNotification("Quote retweet copied to clipboard! Please select 'Quote' manually.", "success");
+            }
+          }
+        }, 300);
+      } else {
+        // If no quote button found, just copy to clipboard
+        if (settings.get('notifications')) {
+          showNotification("Quote retweet copied to clipboard!", "success");
+        }
+      }
+    } else {
+      // Just copy to clipboard without opening composer
+      if (settings.get('notifications')) {
+        showNotification("Quote retweet copied to clipboard!", "success");
+      }
+      
+      analytics.track('quote_copied_only', { 
+        quoteLength: quote.length,
+        composerOpened: false 
+      });
+    }
+  } catch (error) {
+    console.error('Failed to copy quote to clipboard:', error);
+    
+    // Fallback: show the quote in a modal for manual copy
+    showReplyModal(quote);
+    
+    analytics.track('quote_copy_failed', { 
       error: error.message,
       fallbackUsed: true 
     });
@@ -1143,19 +1431,9 @@ function createOptionsPortal(items, onSelect) {
     animation: fadeIn 0.2s ease-out;
   `;
 
-  // Add room descriptions and icons
-  const roomInfo = {
-    rialo: { icon: "🏛️", desc: "Rialo Community" },
-    lighter: { icon: "💡", desc: "Lighter Community" },
-    mmt: { icon: "🚀", desc: "MMT Community" },
-    cys: { icon: "🎯", desc: "Cysic Community" },
-    mega: { icon: "⚡", desc: "Mega Community" },
-    fgo: { icon: "🎮", desc: "FGO Community" },
-    town: { icon: "🏘️", desc: "Town Community" }
-  };
-
+  // Add room descriptions and icons from project.json
   items.forEach((id) => {
-    const info = roomInfo[id] || { icon: "💬", desc: `${id} Community` };
+    const info = getRoomInfo(id);
     
     const row = document.createElement("div");
     row.className = "gemini-dropdown-item";
@@ -1212,7 +1490,7 @@ let globalRoomSelector = null;
 function createGlobalRoomSelector() {
   if (globalRoomSelector) return globalRoomSelector;
 
-  const selectedRoom = settings.get('selectedRoom') || CONFIG.ROOMS[0];
+  const selectedRoom = settings.get('selectedRoom') || getAvailableRooms()[0];
 
   // Create global room selector
   const selector = document.createElement("div");
@@ -1235,18 +1513,8 @@ function createGlobalRoomSelector() {
     transition: all 0.3s ease;
   `;
 
-  // Room info mapping
-  const roomInfo = {
-    rialo: { icon: "🏛️", name: "Rialo" },
-    lighter: { icon: "💡", name: "Lighter" },
-    mmt: { icon: "🚀", name: "MMT" },
-    cys: { icon: "🎯", name: "Cysic" },
-    mega: { icon: "⚡", name: "Mega" },
-    fgo: { icon: "🎮", name: "FGO" },
-    town: { icon: "🏘️", name: "Town" }
-  };
-
-  const currentRoom = roomInfo[selectedRoom] || { icon: "💬", name: selectedRoom };
+  // Room info from project.json
+  const currentRoom = getRoomInfo(selectedRoom);
 
   selector.innerHTML = `
     <div style="display: flex; align-items: center; gap: 8px;">
@@ -1298,8 +1566,8 @@ function createGlobalRoomSelector() {
   `;
 
   // Create dropdown menu
-  const menu = createOptionsPortal(CONFIG.ROOMS, (chosen) => {
-    const room = roomInfo[chosen] || { icon: "💬", name: chosen };
+  const menu = createOptionsPortal(getAvailableRooms(), (chosen) => {
+    const room = getRoomInfo(chosen);
     selector.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px;">
         <span style="font-size: 16px;">${room.icon}</span>
@@ -1426,19 +1694,8 @@ function createGlobalRoomSelector() {
 function updateAllTweetInterfaces() {
   const wrappers = document.querySelectorAll('.gemini-reply-wrapper');
   wrappers.forEach(wrapper => {
-    const currentRoom = settings.get('selectedRoom') || CONFIG.ROOMS[0];
-    // Room info mapping
-  const roomInfo = {
-    rialo: { icon: "🏛️", name: "Rialo" },
-    lighter: { icon: "💡", name: "Lighter" },
-    mmt: { icon: "🚀", name: "MMT" },
-    cys: { icon: "🎯", name: "Cysic" },
-    mega: { icon: "⚡", name: "Mega" },
-    fgo: { icon: "🎮", name: "FGO" },
-    town: { icon: "🏘️", name: "Town" }
-  };
-    
-    const room = roomInfo[currentRoom] || { icon: "💬", name: currentRoom };
+    const currentRoomId = settings.get('selectedRoom') || getAvailableRooms()[0];
+    const room = getRoomInfo(currentRoomId);
     
     // Update any room display in the wrapper if exists
     const roomDisplay = wrapper.querySelector('.current-room-display');
@@ -1459,7 +1716,7 @@ function addReplyButtonToTweet(tweet) {
   if (!textElement) return;
 
   const tweetText = textElement.innerText;
-  const selectedRoom = settings.get('selectedRoom') || CONFIG.ROOMS[0];
+  const selectedRoom = settings.get('selectedRoom') || getAvailableRooms()[0];
 
   // Enhanced wrapper with modern styling (simplified)
   const wrapper = document.createElement("div");
@@ -1481,18 +1738,8 @@ function addReplyButtonToTweet(tweet) {
     pointer-events: auto;
   `;
 
-  // Room info mapping
-  const roomInfo = {
-    rialo: { icon: "🏛️", name: "Rialo" },
-    lighter: { icon: "💡", name: "Lighter" },
-    mmt: { icon: "🚀", name: "MMT" },
-    cys: { icon: "🎯", name: "Cysic" },
-    mega: { icon: "⚡", name: "Mega" },
-    fgo: { icon: "🎮", name: "FGO" },
-    town: { icon: "🏘️", name: "Town" }
-  };
-
-  const currentRoom = roomInfo[selectedRoom] || { icon: "💬", name: selectedRoom };
+  // Room info from project.json
+  const currentRoom = getRoomInfo(selectedRoom);
   
   const roomDisplay = document.createElement("div");
   roomDisplay.className = "current-room-display";
@@ -1520,9 +1767,9 @@ function addReplyButtonToTweet(tweet) {
     align-items: center;
   `;
 
-  // Main Generate Button
+  // Main Generate Reply Button
   const genBtn = document.createElement("button");
-  genBtn.innerText = "💬 Generate";
+  genBtn.innerText = "💬 Reply";
   genBtn.className = "gemini-room-btn";
   genBtn.style.cssText = `
     background: linear-gradient(135deg, ${CONFIG.THEME.primary}, #1a8cd8);
@@ -1557,38 +1804,65 @@ function addReplyButtonToTweet(tweet) {
   genBtn.addEventListener("click", async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log("[Gemini] Generate button clicked!");
+    console.log("[Gemini] Generate Reply button clicked!");
     
-    // Check authentication with better error handling
-    try {
-      const userData = await chrome.storage.local.get(['geminiUser']);
-      console.log('[Gemini] Current user data:', userData);
-      
-      if (!userData.geminiUser) {
-        console.log('[Gemini] No user data found, showing login modal');
-        showNotification("Please login to use AI features", "error");
-        if (window.geminiAuthUI) {
-          window.geminiAuthUI.showAuthModal();
-        } else {
-          showSimpleLoginModal();
-        }
-        return;
-      }
-      
-      console.log('[Gemini] User authenticated:', userData.geminiUser.user_mail);
-    } catch (error) {
-      console.error('[Gemini] Error checking authentication:', error);
-      showNotification("Authentication error. Please try again.", "error");
-      return;
-    }
+    // No authentication required
     
-    const roomId = settings.get('selectedRoom') || CONFIG.ROOMS[0];
+    const roomId = settings.get('selectedRoom') || getAvailableRooms()[0];
     if (!roomId) {
       showNotification("Please select a room first!", "warning");
       return;
     }
     analytics.track('generate_button_clicked', { roomId, tweetLength: tweetText.length });
     await handleGenerate({ tweet, tweetText, roomId, btn: genBtn });
+  });
+
+  // Generate Quote Retweet Button
+  const quoteBtn = document.createElement("button");
+  quoteBtn.innerText = "🔁 Quote";
+  quoteBtn.className = "gemini-quote-btn";
+  quoteBtn.style.cssText = `
+    background: linear-gradient(135deg, #00ba7c, #00a86b);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 8px rgba(0, 186, 124, 0.3);
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
+  `;
+
+  // Hover effects for quote button
+  quoteBtn.addEventListener('mouseenter', () => {
+    quoteBtn.style.transform = 'translateY(-1px)';
+    quoteBtn.style.boxShadow = '0 4px 16px rgba(0, 186, 124, 0.4)';
+  });
+  
+  quoteBtn.addEventListener('mouseleave', () => {
+    quoteBtn.style.transform = 'translateY(0)';
+    quoteBtn.style.boxShadow = '0 2px 8px rgba(0, 186, 124, 0.3)';
+  });
+
+  quoteBtn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("[Gemini] Generate Quote Retweet button clicked!");
+    
+    const roomId = settings.get('selectedRoom') || getAvailableRooms()[0];
+    if (!roomId) {
+      showNotification("Please select a room first!", "warning");
+      return;
+    }
+    analytics.track('generate_quote_button_clicked', { roomId, tweetLength: tweetText.length });
+    await handleGenerateQuote({ tweet, tweetText, roomId, btn: quoteBtn });
   });
 
   // Quick Actions Button
@@ -1615,13 +1889,165 @@ function addReplyButtonToTweet(tweet) {
     e.stopPropagation();
     console.log("[Gemini] Quick button clicked!");
     
-    const roomId = settings.get('selectedRoom') || CONFIG.ROOMS[0];
+    const roomId = settings.get('selectedRoom') || getAvailableRooms()[0];
     if (!roomId) {
       showNotification("Please select a room first!", "warning");
       return;
     }
     analytics.track('quick_generate_clicked', { roomId });
     handleGenerate({ tweet, tweetText, roomId, btn: quickBtn, showPreview: false });
+  });
+
+  // Translate Button (tweet text -> EN, copied to clipboard)
+  const translateBtn = document.createElement("button");
+  translateBtn.innerHTML = "🌐 Translate";
+  translateBtn.title = "Translate from Indonesian to natural English and copy";
+  translateBtn.style.cssText = `
+    background: ${CONFIG.THEME.warning};
+    color: black;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
+  `;
+
+  translateBtn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Get text from user's reply input field, not from the tweet
+    const text = getTwitterReplyInputText();
+    if (!text) {
+      showNotification("Please type your text in the reply box first.", "error");
+      return;
+    }
+
+    const originalText = translateBtn.innerText;
+    translateBtn.innerText = "⏳ Translating...";
+    translateBtn.disabled = true;
+    translateBtn.style.opacity = "0.7";
+
+    try {
+      const res = await fetch(`${CONFIG.API_BASE_URL}/generate-translate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data?.text) {
+        throw new Error(data?.error || "Failed to translate");
+      }
+
+      const translated = data.text.trim();
+      
+      // Try to paste directly to input field
+      const inputField = document.querySelector('div[data-testid="tweetTextarea_0"]') || 
+                        document.querySelector('div[role="textbox"][data-testid="tweetTextarea_0"]') ||
+                        document.querySelector('div[role="textbox"]');
+      
+      if (inputField) {
+        inputField.focus();
+        inputField.innerText = translated;
+        // Trigger input event for Twitter's character counter
+        const event = new Event('input', { bubbles: true });
+        inputField.dispatchEvent(event);
+        showNotification("Translated text pasted to reply box!", "success");
+      } else {
+        // Fallback: copy to clipboard
+        await navigator.clipboard.writeText(translated);
+        showNotification("Translated text copied to clipboard!", "success");
+      }
+    } catch (err) {
+      console.error("[Gemini] Translate error:", err);
+      showNotification("Failed to translate text.", "error");
+    } finally {
+      translateBtn.innerText = originalText;
+      translateBtn.disabled = false;
+      translateBtn.style.opacity = "1";
+    }
+  });
+
+  // Polish / Paraphrase Button (tweet text -> polished EN, copied)
+  const polishBtn = document.createElement("button");
+  polishBtn.innerHTML = "✨ Polish";
+  polishBtn.title = "Polish / paraphrase English text and copy";
+  polishBtn.style.cssText = `
+    background: ${CONFIG.THEME.accent};
+    color: ${CONFIG.THEME.text};
+    border: 1px solid ${CONFIG.THEME.primary};
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
+  `;
+
+  polishBtn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Get text from user's reply input field, not from the tweet
+    const text = getTwitterReplyInputText();
+    if (!text) {
+      showNotification("Please type your text in the reply box first.", "error");
+      return;
+    }
+
+    const originalText = polishBtn.innerText;
+    polishBtn.innerText = "⏳ Polishing...";
+    polishBtn.disabled = true;
+    polishBtn.style.opacity = "0.7";
+
+    try {
+      const res = await fetch(`${CONFIG.API_BASE_URL}/generate-parafrase`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data?.text) {
+        throw new Error(data?.error || "Failed to polish");
+      }
+
+      const polished = data.text.trim();
+      
+      // Try to paste directly to input field
+      const inputField = document.querySelector('div[data-testid="tweetTextarea_0"]') || 
+                        document.querySelector('div[role="textbox"][data-testid="tweetTextarea_0"]') ||
+                        document.querySelector('div[role="textbox"]');
+      
+      if (inputField) {
+        inputField.focus();
+        inputField.innerText = polished;
+        // Trigger input event for Twitter's character counter
+        const event = new Event('input', { bubbles: true });
+        inputField.dispatchEvent(event);
+        showNotification("Polished text pasted to reply box!", "success");
+      } else {
+        // Fallback: copy to clipboard
+        await navigator.clipboard.writeText(polished);
+        showNotification("Polished text copied to clipboard!", "success");
+      }
+    } catch (err) {
+      console.error("[Gemini] Polish error:", err);
+      showNotification("Failed to polish text.", "error");
+    } finally {
+      polishBtn.innerText = originalText;
+      polishBtn.disabled = false;
+      polishBtn.style.opacity = "1";
+    }
   });
 
   // Settings Button
@@ -1710,7 +2136,10 @@ function addReplyButtonToTweet(tweet) {
   });
 
   buttonContainer.appendChild(genBtn);
+  buttonContainer.appendChild(quoteBtn);
   buttonContainer.appendChild(quickBtn);
+  buttonContainer.appendChild(translateBtn);
+  buttonContainer.appendChild(polishBtn);
   buttonContainer.appendChild(settingsBtn);
   buttonContainer.appendChild(debugBtn);
 
@@ -2100,7 +2529,7 @@ const observer = new MutationObserver(() => {
 });
 
 // Enhanced initialization with better error handling
-function initializeExtension() {
+async function initializeExtension() {
   try {
     // Track extension startup
     analytics.track('extension_initialized', {
@@ -2108,6 +2537,12 @@ function initializeExtension() {
       timestamp: Date.now(),
       userAgent: navigator.userAgent
     });
+
+    // Load project.json data first
+    await loadProjectData();
+
+    // Load dynamic rooms from user first
+    await initRoomsFromUser();
 
     // Create global room selector (only once)
     createGlobalRoomSelector();
@@ -2160,13 +2595,7 @@ function initializeExtension() {
   }
 }
 
-// Listen for authentication messages from popup
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'USER_LOGGED_IN') {
-    console.log('[Gemini] User logged in:', message.user);
-    showNotification(`Welcome ${message.user.user_mail}! You have ${message.user.user_token.toLocaleString()} tokens.`, 'success');
-  }
-});
+// No auth messaging needed in local mode
 
 // Check login status on initialization
 async function checkLoginStatus() {

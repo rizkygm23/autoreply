@@ -1,0 +1,59 @@
+{
+  "rooms": [
+    {
+      "id": "rialo",
+      "icon": "🏛️",
+      "name": "Rialo",
+      "desc": "Rialo Community"
+    },
+    {
+      "id": "lighter",
+      "icon": "💡",
+      "name": "Lighter",
+      "desc": "Lighter Community"
+    },
+    {
+      "id": "creek",
+      "icon": "🌊",
+      "name": "Creek",
+      "desc": "Creek Community"
+    },
+    {
+      "id": "cys",
+      "icon": "🎯",
+      "name": "Cysic",
+      "desc": "Cysic Community"
+    },
+    {
+      "id": "town",
+      "icon": "🏘️",
+      "name": "Town",
+      "desc": "Town Community"
+    },
+    {
+      "id": "fgo",
+      "icon": "🎮",
+      "name": "FGO",
+      "desc": "FGO Community"
+    },
+    {
+      "id": "mmt",
+      "icon": "🚀",
+      "name": "MMT",
+      "desc": "MMT Community"
+    },
+    {
+      "id": "mega",
+      "icon": "⚡",
+      "name": "Mega",
+      "desc": "Mega Community"
+    },
+    {
+      "id": "seismic",
+      "icon": "🌍",
+      "name": "Seismic",
+      "desc": "Seismic Community"
+    }
+  ]
+}
+

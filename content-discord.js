@@ -13,9 +13,9 @@ document.head.appendChild(authScript);
 
 // === Enhanced Configuration
 const CONFIG = {
-  ROOMS: ["mmt", "cys", "mega", "fgo", "rialo", "lighter", "town"],
+  ROOMS: [], // Will be loaded from project.json
   MAX_REPLIES: 20,
-  API_BASE_URL: "https://autoreply-gt64.onrender.com",
+  API_BASE_URL: "http://localhost:3000",
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
   THEME: {
@@ -29,6 +29,88 @@ const CONFIG = {
     warning: "#ffd400"
   }
 };
+
+// Project data loaded from project.json
+let projectData = null;
+let roomInfoMap = {};
+
+// Embedded fallback data (from project.json)
+const FALLBACK_PROJECT_DATA = {
+  "rooms": [
+    { "id": "rialo", "icon": "🏛️", "name": "Rialo", "desc": "Rialo Community" },
+    { "id": "lighter", "icon": "💡", "name": "Lighter", "desc": "Lighter Community" },
+    { "id": "creek", "icon": "🌊", "name": "Creek", "desc": "Creek Community" },
+    { "id": "cys", "icon": "🎯", "name": "Cysic", "desc": "Cysic Community" },
+    { "id": "town", "icon": "🏘️", "name": "Town", "desc": "Town Community" },
+    { "id": "fgo", "icon": "🎮", "name": "FGO", "desc": "FGO Community" },
+    { "id": "mmt", "icon": "🚀", "name": "MMT", "desc": "MMT Community" },
+    { "id": "mega", "icon": "⚡", "name": "Mega", "desc": "Mega Community" },
+    { "id": "seismic", "icon": "🌍", "name": "Seismic", "desc": "Seismic Community" }
+  ]
+};
+
+// Process project data into CONFIG.ROOMS and roomInfoMap
+function processProjectData(data) {
+  if (data.rooms && Array.isArray(data.rooms)) {
+    CONFIG.ROOMS = data.rooms.map(room => room.id);
+    
+    // Build roomInfoMap for quick lookup
+    roomInfoMap = {};
+    data.rooms.forEach(room => {
+      roomInfoMap[room.id] = {
+        icon: room.icon || "💬",
+        name: room.name || room.id,
+        desc: room.desc || `${room.name || room.id} Community`
+      };
+    });
+    
+    console.log('[Gemini Discord] Loaded', CONFIG.ROOMS.length, 'rooms:', CONFIG.ROOMS);
+    return true;
+  }
+  return false;
+}
+
+// Load project.json data
+async function loadProjectData() {
+  try {
+    const url = chrome.runtime.getURL('project.json');
+    console.log('[Gemini Discord] Attempting to load project.json from:', url);
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    projectData = await response.json();
+    
+    if (processProjectData(projectData)) {
+      console.log('[Gemini Discord] ✅ Successfully loaded project.json');
+      return;
+    } else {
+      throw new Error('Invalid project.json structure');
+    }
+  } catch (error) {
+    console.warn('[Gemini Discord] ⚠️ Failed to load project.json:', error.message);
+    console.log('[Gemini Discord] Using embedded fallback data');
+    
+    // Use embedded fallback data
+    projectData = FALLBACK_PROJECT_DATA;
+    processProjectData(projectData);
+  }
+}
+
+// Dynamically supplied rooms from Supabase user.user_room
+let dynamicRooms = null;
+function getAvailableRooms() {
+  return Array.isArray(dynamicRooms) && dynamicRooms.length > 0 ? dynamicRooms : CONFIG.ROOMS;
+}
+
+// Get room info from project.json data
+function getRoomInfo(roomId) {
+  return roomInfoMap[roomId] || { icon: "💬", name: roomId, desc: `${roomId} Community` };
+}
+
+async function initRoomsFromUser() {}
 
 // === Enhanced Storage & Settings
 class ExtensionSettings {
@@ -646,7 +728,7 @@ let globalRoomSelector = null;
 function createGlobalRoomSelector() {
   if (globalRoomSelector) return globalRoomSelector;
 
-  const selectedRoom = settings.get('selectedRoom') || CONFIG.ROOMS[0];
+  const selectedRoom = settings.get('selectedRoom') || getAvailableRooms()[0];
 
   // Create global room selector
   const selector = document.createElement("div");
@@ -669,18 +751,8 @@ function createGlobalRoomSelector() {
     transition: all 0.3s ease;
   `;
 
-  // Room info mapping
-  const roomInfo = {
-    rialo: { icon: "🏛️", name: "Rialo" },
-    lighter: { icon: "💡", name: "Lighter" },
-    mmt: { icon: "🚀", name: "MMT" },
-    cys: { icon: "🎯", name: "Cysic" },
-    mega: { icon: "⚡", name: "Mega" },
-    fgo: { icon: "🎮", name: "FGO" },
-    town: { icon: "🏘️", name: "Town" }
-  };
-
-  const currentRoom = roomInfo[selectedRoom] || { icon: "💬", name: selectedRoom };
+  // Room info from project.json
+  const currentRoom = getRoomInfo(selectedRoom);
 
   selector.innerHTML = `
     <div style="display: flex; align-items: center; gap: 8px;">
@@ -717,8 +789,8 @@ function createGlobalRoomSelector() {
   `;
 
   // Create dropdown menu
-  const menu = createOptionsPortal(CONFIG.ROOMS, (chosen) => {
-    const room = roomInfo[chosen] || { icon: "💬", name: chosen };
+  const menu = createOptionsPortal(getAvailableRooms(), (chosen) => {
+    const room = getRoomInfo(chosen);
     selector.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px;">
         <span style="font-size: 16px;">${room.icon}</span>
@@ -827,18 +899,8 @@ function createGlobalRoomSelector() {
 function updateAllMessageInterfaces() {
   const wrappers = document.querySelectorAll('.gemini-reply-wrapper');
   wrappers.forEach(wrapper => {
-    const currentRoom = settings.get('selectedRoom') || CONFIG.ROOMS[0];
-    const roomInfo = {
-      rialo: { icon: "🏛️", name: "Rialo" },
-      lighter: { icon: "💡", name: "Lighter" },
-      mmt: { icon: "🚀", name: "MMT" },
-      cys: { icon: "🎯", name: "Cysic" },
-      mega: { icon: "⚡", name: "Mega" },
-      fgo: { icon: "🎮", name: "FGO" },
-      town: { icon: "🏘️", name: "Town" }
-    };
-    
-    const room = roomInfo[currentRoom] || { icon: "💬", name: currentRoom };
+    const currentRoomId = settings.get('selectedRoom') || getAvailableRooms()[0];
+    const room = getRoomInfo(currentRoomId);
     
     // Update any room display in the wrapper if exists
     const roomDisplay = wrapper.querySelector('.current-room-display');
@@ -852,7 +914,7 @@ function updateAllMessageInterfaces() {
 }
 
 function getSelectedRoomId() {
-  return settings.get('selectedRoom') || CONFIG.ROOMS[0];
+  return settings.get('selectedRoom') || getAvailableRooms()[0];
 }
 
 // ===== Custom dropdown (portal ke <body>) =====
@@ -904,17 +966,8 @@ function addReplyButtonToMessage(message) {
   if (!contentText) return;
 
   const caption = contentText;
-  const currentRoom = settings.get('selectedRoom') || CONFIG.ROOMS[0];
-  const roomInfo = {
-    rialo: { icon: "🏛️", name: "Rialo" },
-    lighter: { icon: "💡", name: "Lighter" },
-    mmt: { icon: "🚀", name: "MMT" },
-    cys: { icon: "🎯", name: "Cysic" },
-    mega: { icon: "⚡", name: "Mega" },
-    fgo: { icon: "🎮", name: "FGO" },
-    town: { icon: "🏘️", name: "Town" }
-  };
-  const room = roomInfo[currentRoom] || { icon: "💬", name: currentRoom };
+  const currentRoomId = settings.get('selectedRoom') || getAvailableRooms()[0];
+  const room = getRoomInfo(currentRoomId);
 
   const wrapper = document.createElement("div");
   wrapper.className = "gemini-reply-wrapper";
@@ -987,29 +1040,7 @@ function addReplyButtonToMessage(message) {
   });
 
   genBtn.onclick = async () => {
-    // Check authentication with better error handling
-    let userData;
-    try {
-      userData = await chrome.storage.local.get(['geminiUser']);
-      console.log('[Gemini Discord] Current user data:', userData);
-      
-      if (!userData.geminiUser) {
-        console.log('[Gemini Discord] No user data found, showing login modal');
-        showNotification("Please login to use AI features", "error");
-        if (window.geminiAuthUI) {
-          window.geminiAuthUI.showAuthModal();
-        } else {
-          showSimpleLoginModal();
-        }
-        return;
-      }
-      
-      console.log('[Gemini Discord] User authenticated:', userData.geminiUser.user_mail);
-    } catch (error) {
-      console.error('[Gemini Discord] Error checking authentication:', error);
-      showNotification("Authentication error. Please try again.", "error");
-      return;
-    }
+    // No authentication required in local mode
 
     const roomId = getSelectedRoomId();
     if (!roomId) {
@@ -1028,12 +1059,7 @@ function addReplyButtonToMessage(message) {
       const response = await fetch(`${CONFIG.API_BASE_URL}/generate-discord`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          caption, 
-          roomId, 
-          komentar,
-          userId: userData.geminiUser.user_id
-        })
+        body: JSON.stringify({ caption, roomId, komentar })
       });
       
       const data = await response.json();
@@ -1059,18 +1085,9 @@ function addReplyButtonToMessage(message) {
 
       await copyToClipboard(latestReply);
       
-      analytics.track('discord_generate_success', { 
-        roomId, 
-        generationTime,
-        replyLength: latestReply.length,
-        platform: 'discord',
-        tokensUsed: data.tokensUsed,
-        remainingTokens: data.remainingTokens
-      });
+      analytics.track('discord_generate_success', { roomId, generationTime, replyLength: latestReply.length, platform: 'discord' });
       
-      if (settings.get('notifications')) {
-        showNotification(`Reply generated! Used ${data.tokensUsed} tokens. ${data.remainingTokens} remaining.`, "success");
-      }
+      if (settings.get('notifications')) showNotification("Reply generated!", "success");
       
       setBtnLoading(genBtn, false, "✅ Done!");
     } catch (err) {
@@ -1105,29 +1122,6 @@ function addReplyButtonToMessage(message) {
     transition: all 0.2s ease;
   `;
   quickBtn.onclick = async () => {
-    // Check authentication
-    let userData;
-    try {
-      userData = await chrome.storage.local.get(['geminiUser']);
-      console.log('[Gemini Discord] Quick generate - Current user data:', userData);
-      
-      if (!userData.geminiUser) {
-        console.log('[Gemini Discord] Quick generate - No user data found, showing login modal');
-        showNotification("Please login to use AI features", "error");
-        if (window.geminiAuthUI) {
-          window.geminiAuthUI.showAuthModal();
-        } else {
-          showSimpleLoginModal();
-        }
-        return;
-      }
-      
-      console.log('[Gemini Discord] Quick generate - User authenticated:', userData.geminiUser.user_mail);
-    } catch (error) {
-      console.error('[Gemini Discord] Quick generate - Error checking authentication:', error);
-      showNotification("Authentication error. Please try again.", "error");
-      return;
-    }
 
     const roomId = getSelectedRoomId();
     if (!roomId) {
@@ -1139,7 +1133,7 @@ function addReplyButtonToMessage(message) {
     try {
       const data = await apiClient.request("/generate-quick", {
         method: "POST",
-        body: JSON.stringify({ caption, roomId, userId: userData.geminiUser.user_id })
+        body: JSON.stringify({ caption, roomId })
       });
       
       latestReply = data.reply || "Quick reply generated!";
@@ -1872,7 +1866,7 @@ function injectComposerToolbar() {
 
     setBtnBusy(btnTranslate, true);
     try {
-      const res = await fetch("https://autoreply-gt64.onrender.com/generate-translate", {
+      const res = await fetch(`${CONFIG.API_BASE_URL}/generate-translate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
@@ -1897,7 +1891,7 @@ function injectComposerToolbar() {
 
     setBtnBusy(btnParaphrase, true);
     try {
-      const res = await fetch("https://autoreply-gt64.onrender.com/generate-parafrase", {
+      const res = await fetch(`${CONFIG.API_BASE_URL}/generate-parafrase`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
@@ -1923,7 +1917,7 @@ function injectComposerToolbar() {
 }
 
 // === Enhanced Initialization & CSS Animations
-function initializeDiscordExtension() {
+async function initializeDiscordExtension() {
   console.log('🚀 Initializing Enhanced Gemini Discord Extension...');
   
   // Add CSS animations
@@ -1963,7 +1957,11 @@ function initializeDiscordExtension() {
   `;
   document.head.appendChild(style);
 
-  // Create global room selector
+  // Load project.json data first
+  await loadProjectData();
+  
+  // Load dynamic rooms then create global room selector
+  await initRoomsFromUser();
   createGlobalRoomSelector();
   
   // Add keyboard shortcuts
@@ -2012,12 +2010,7 @@ const composerObserver = new MutationObserver(() => {
 composerObserver.observe(document.body, { childList: true, subtree: true });
 
 // Listen for authentication messages from popup
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'USER_LOGGED_IN') {
-    console.log('[Gemini Discord] User logged in:', message.user);
-    showNotification(`Welcome ${message.user.user_mail}! You have ${message.user.user_token.toLocaleString()} tokens.`, 'success');
-  }
-});
+// No auth messaging needed in local mode
 
 // Initialize extension
 setTimeout(() => {
