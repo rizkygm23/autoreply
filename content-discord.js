@@ -20,7 +20,7 @@ const CONFIG = {
   RETRY_DELAY: 1000,
   THEME: {
     primary: "#5865F2",
-    secondary: "#2b2d31", 
+    secondary: "#2b2d31",
     accent: "rgba(88,101,242,.2)",
     text: "#e7e9ea",
     border: "#3b3d43",
@@ -53,7 +53,7 @@ const FALLBACK_PROJECT_DATA = {
 function processProjectData(data) {
   if (data.rooms && Array.isArray(data.rooms)) {
     CONFIG.ROOMS = data.rooms.map(room => room.id);
-    
+
     // Build roomInfoMap for quick lookup
     roomInfoMap = {};
     data.rooms.forEach(room => {
@@ -63,7 +63,7 @@ function processProjectData(data) {
         desc: room.desc || `${room.name || room.id} Community`
       };
     });
-    
+
     console.log('[Gemini Discord] Loaded', CONFIG.ROOMS.length, 'rooms:', CONFIG.ROOMS);
     return true;
   }
@@ -75,14 +75,14 @@ async function loadProjectData() {
   try {
     const url = chrome.runtime.getURL('project.json');
     console.log('[Gemini Discord] Attempting to load project.json from:', url);
-    
+
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    
+
     projectData = await response.json();
-    
+
     if (processProjectData(projectData)) {
       console.log('[Gemini Discord] ✅ Successfully loaded project.json');
       return;
@@ -92,7 +92,7 @@ async function loadProjectData() {
   } catch (error) {
     console.warn('[Gemini Discord] ⚠️ Failed to load project.json:', error.message);
     console.log('[Gemini Discord] Using embedded fallback data');
-    
+
     // Use embedded fallback data
     projectData = FALLBACK_PROJECT_DATA;
     processProjectData(projectData);
@@ -110,7 +110,7 @@ function getRoomInfo(roomId) {
   return roomInfoMap[roomId] || { icon: "💬", name: roomId, desc: `${roomId} Community` };
 }
 
-async function initRoomsFromUser() {}
+async function initRoomsFromUser() { }
 
 // === Enhanced Storage & Settings
 class ExtensionSettings {
@@ -186,7 +186,7 @@ class Analytics {
 
   track(event, data = {}) {
     if (!settings.get('analytics')) return;
-    
+
     const eventData = {
       timestamp: Date.now(),
       event,
@@ -195,14 +195,14 @@ class Analytics {
       userAgent: navigator.userAgent,
       platform: 'discord'
     };
-    
+
     this.events.push(eventData);
-    
+
     // Keep only last 1000 events
     if (this.events.length > 1000) {
       this.events = this.events.slice(-1000);
     }
-    
+
     this.saveEvents();
   }
 
@@ -210,10 +210,10 @@ class Analytics {
     const now = Date.now();
     const last24h = now - (24 * 60 * 60 * 1000);
     const last7d = now - (7 * 24 * 60 * 60 * 1000);
-    
+
     const recent = this.events.filter(e => e.timestamp > last24h);
     const weekly = this.events.filter(e => e.timestamp > last7d);
-    
+
     return {
       total: this.events.length,
       last24h: recent.length,
@@ -246,51 +246,51 @@ class ApiClient {
       headers: { "Content-Type": "application/json" },
       timeout: 30000
     };
-    
+
     const requestOptions = { ...defaultOptions, ...options };
-    
+
     try {
       analytics.track('api_request_start', { endpoint, retryCount, platform: 'discord' });
-      
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), requestOptions.timeout);
-      
+
       const response = await fetch(url, {
         ...requestOptions,
         signal: controller.signal
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
       analytics.track('api_request_success', { endpoint, retryCount, platform: 'discord' });
-      
+
       return data;
     } catch (error) {
-      analytics.track('api_request_error', { 
-        endpoint, 
-        retryCount, 
+      analytics.track('api_request_error', {
+        endpoint,
+        retryCount,
         error: error.message,
         platform: 'discord'
       });
-      
+
       if (retryCount < CONFIG.RETRY_ATTEMPTS && this.shouldRetry(error)) {
         await this.delay(CONFIG.RETRY_DELAY * (retryCount + 1));
         return this.request(endpoint, options, retryCount + 1);
       }
-      
+
       throw error;
     }
   }
 
   shouldRetry(error) {
-    return error.name === 'AbortError' || 
-           error.message.includes('Failed to fetch') ||
-           error.message.includes('NetworkError');
+    return error.name === 'AbortError' ||
+      error.message.includes('Failed to fetch') ||
+      error.message.includes('NetworkError');
   }
 
   delay(ms) {
@@ -316,7 +316,7 @@ async function getNearbyReplies(currentMessage) {
   ];
 
   let allMessages = [];
-  
+
   // Try each selector strategy
   for (const selector of messageSelectors) {
     try {
@@ -339,9 +339,9 @@ async function getNearbyReplies(currentMessage) {
       const timestamp = msg.querySelector('time')?.getAttribute('datetime');
       const reactions = msg.querySelectorAll('[class*="reaction"]');
       const reactionCount = reactions.length;
-      
-      replies.push({ 
-        username, 
+
+      replies.push({
+        username,
         reply: contentText,
         timestamp,
         reactions: reactionCount,
@@ -353,8 +353,8 @@ async function getNearbyReplies(currentMessage) {
 
   // Sort by engagement for better context
   replies.sort((a, b) => b.engagement - a.engagement);
-  
-  analytics.track('discord_messages_collected', { 
+
+  analytics.track('discord_messages_collected', {
     count: replies.length,
     maxReplies,
     platform: 'discord'
@@ -481,7 +481,7 @@ function showSimpleLoginModal() {
   modal.querySelector('#simpleLogin').onclick = async () => {
     const email = modal.querySelector('#simpleEmail').value.trim();
     const password = modal.querySelector('#simplePassword').value.trim();
-    
+
     if (!email || !password) {
       alert('Please enter both email and password');
       return;
@@ -499,23 +499,23 @@ function showSimpleLoginModal() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-      
+
       console.log('[Gemini Discord] Login response status:', response.status);
-      
+
       if (response.ok) {
         const data = await response.json();
         console.log('[Gemini Discord] Login response data:', data);
-        
+
         if (data.user) {
           // Store user data
           await chrome.storage.local.set({ geminiUser: data.user });
           console.log('[Gemini Discord] User data stored:', data.user);
           modal.remove();
           showNotification('Login successful! Welcome to Gemini Auto Reply!', 'success');
-          
+
           // Notify content scripts about login
           chrome.runtime.sendMessage({ type: 'USER_LOGGED_IN', user: data.user });
-          
+
           // Retry the original action
           if (originalAction) {
             originalAction();
@@ -541,12 +541,12 @@ function showSimpleLoginModal() {
       loginBtn.disabled = false;
     }
   };
-  
+
   // Register handler
   modal.querySelector('#simpleRegister').onclick = async () => {
     const email = modal.querySelector('#simpleEmail').value.trim();
     const password = modal.querySelector('#simplePassword').value.trim();
-    
+
     if (!email || !password) {
       alert('Please enter both email and password');
       return;
@@ -568,15 +568,15 @@ function showSimpleLoginModal() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
         // Store user data
         await chrome.storage.local.set({ geminiUser: data.user });
         modal.remove();
         showNotification('Registration successful! Welcome to Gemini Auto Reply!', 'success');
-        
+
         // Retry the original action
         if (originalAction) {
           originalAction();
@@ -586,7 +586,7 @@ function showSimpleLoginModal() {
         await chrome.storage.local.set({ geminiUser: data.user });
         modal.remove();
         showNotification('User already exists! Logged in successfully.', 'success');
-        
+
         // Retry the original action
         if (originalAction) {
           originalAction();
@@ -602,14 +602,14 @@ function showSimpleLoginModal() {
       registerBtn.disabled = false;
     }
   };
-  
+
   // Close on outside click
   modal.onclick = (e) => {
     if (e.target === modal) modal.remove();
   };
 
   document.body.appendChild(modal);
-  
+
   // Focus email input
   setTimeout(() => {
     modal.querySelector('#simpleEmail').focus();
@@ -633,10 +633,10 @@ function showNotification(message, type = 'info') {
     animation: slideIn 0.3s ease-out;
     max-width: 300px;
   `;
-  
+
   notification.textContent = message;
   document.body.appendChild(notification);
-  
+
   setTimeout(() => {
     notification.style.animation = 'slideOut 0.3s ease-in';
     setTimeout(() => notification.remove(), 300);
@@ -660,8 +660,8 @@ function showMiniToast(anchorEl, msg = "Copied!") {
     box-shadow: 0 6px 20px rgba(0,0,0,.25);
   `;
   const host = anchorEl.closest('[class*="channelTextArea"]')
-            || anchorEl.closest('[id^="chat-messages-"]')
-            || document.body;
+    || anchorEl.closest('[id^="chat-messages-"]')
+    || document.body;
   if (host === document.body && getComputedStyle(host).position === "static") {
     document.body.style.position = "relative";
   }
@@ -826,10 +826,10 @@ function createGlobalRoomSelector() {
     `;
     settings.set('selectedRoom', chosen);
     hideMenu();
-    
+
     // Update all existing message interfaces
     updateAllMessageInterfaces();
-    
+
     if (settings.get('notifications')) {
       showNotification(`Room changed to ${room.name}`, "success");
     }
@@ -840,7 +840,7 @@ function createGlobalRoomSelector() {
     selector.style.transform = 'translateY(-2px)';
     selector.style.boxShadow = '0 12px 30px rgba(0,0,0,0.4)';
   });
-  
+
   selector.addEventListener('mouseleave', () => {
     selector.style.transform = 'translateY(0)';
     selector.style.boxShadow = '0 8px 25px rgba(0,0,0,0.3)';
@@ -858,7 +858,7 @@ function createGlobalRoomSelector() {
     placeMenu();
     menu.style.display = "block";
   }
-  
+
   function hideMenu() {
     menu.style.display = "none";
   }
@@ -891,7 +891,7 @@ function createGlobalRoomSelector() {
   globalRoomSelector = selector;
 
   analytics.track('global_room_selector_created', { selectedRoom, platform: 'discord' });
-  
+
   return selector;
 }
 
@@ -901,7 +901,7 @@ function updateAllMessageInterfaces() {
   wrappers.forEach(wrapper => {
     const currentRoomId = settings.get('selectedRoom') || getAvailableRooms()[0];
     const room = getRoomInfo(currentRoomId);
-    
+
     // Update any room display in the wrapper if exists
     const roomDisplay = wrapper.querySelector('.current-room-display');
     if (roomDisplay) {
@@ -962,7 +962,7 @@ function createOptionsPortal(items, onSelect) {
 function addReplyButtonToMessage(message) {
   if (!message || message.querySelector(".gemini-reply-wrapper")) return;
 
-  const { contentText } = extractMessagePieces(message);
+  const { contentText, username } = extractMessagePieces(message);
   if (!contentText) return;
 
   const caption = contentText;
@@ -1050,18 +1050,18 @@ function addReplyButtonToMessage(message) {
 
     analytics.track('discord_generate_start', { roomId, platform: 'discord' });
     setBtnLoading(genBtn, true);
-    
+
     try {
       const startTime = Date.now();
       const komentar = await getNearbyReplies(message);
-      
+
       // Use direct API request with userId
       const response = await fetch(`${CONFIG.API_BASE_URL}/generate-discord`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caption, roomId, komentar })
+        body: JSON.stringify({ caption, roomId, komentar, username })
       });
-      
+
       const data = await response.json();
 
       if (!response.ok) {
@@ -1084,20 +1084,20 @@ function addReplyButtonToMessage(message) {
       latestReply = data.reply || "Failed to generate reply 😅";
 
       await copyToClipboard(latestReply);
-      
+
       analytics.track('discord_generate_success', { roomId, generationTime, replyLength: latestReply.length, platform: 'discord' });
-      
+
       if (settings.get('notifications')) showNotification("Reply generated!", "success");
-      
+
       setBtnLoading(genBtn, false, "✅ Done!");
     } catch (err) {
       console.error("❌ Error:", err);
-      analytics.track('discord_generate_error', { 
-        roomId, 
+      analytics.track('discord_generate_error', {
+        roomId,
         error: err.message,
         platform: 'discord'
       });
-      
+
       if (settings.get('notifications')) {
         showNotification("Failed to generate reply. Please try again.", "error");
       } else {
@@ -1133,16 +1133,16 @@ function addReplyButtonToMessage(message) {
     try {
       const data = await apiClient.request("/generate-quick", {
         method: "POST",
-        body: JSON.stringify({ caption, roomId })
+        body: JSON.stringify({ caption, roomId, username })
       });
-      
+
       latestReply = data.reply || "Quick reply generated!";
       await copyToClipboard(latestReply);
-      
+
       if (settings.get('notifications')) {
         showNotification("Quick reply generated!", "success");
       }
-      
+
       setBtnLoading(quickBtn, false, "✅");
     } catch (err) {
       console.error("Quick generate error:", err);
@@ -1171,7 +1171,7 @@ function addReplyButtonToMessage(message) {
   row.appendChild(genBtn);
   row.appendChild(quickBtn);
   row.appendChild(debugBtn);
-  
+
   wrapper.appendChild(roomDisplay);
   wrapper.appendChild(row);
 
@@ -1222,7 +1222,7 @@ function addReplyButtonToMessage(message) {
       const data = await res.json();
       const out =
         Array.isArray(data.topics) ? data.topics.join("\n")
-        : (data.topic || data.text || "");
+          : (data.topic || data.text || "");
       latestReply = out || "Gagal generate 😅";
 
       await copyToClipboard(latestReply);
@@ -1312,7 +1312,7 @@ function addReplyButtonToMessage(message) {
 // === Settings Panel for Discord
 function showSettingsPanel() {
   console.log('🔧 showSettingsPanel called');
-  
+
   // Remove existing panel if any
   const existing = document.querySelector('.gemini-settings-panel');
   if (existing) {
@@ -1320,7 +1320,7 @@ function showSettingsPanel() {
     existing.remove();
     return;
   }
-  
+
   console.log('🆕 Creating new settings panel');
 
   const panel = document.createElement('div');
@@ -1441,32 +1441,32 @@ function showSettingsPanel() {
 
   // Event listeners
   document.getElementById('closeSettings').onclick = () => panel.remove();
-  
+
   document.getElementById('showPreview').onchange = (e) => {
     settings.set('showPreview', e.target.checked);
   };
-  
+
   document.getElementById('notifications').onchange = (e) => {
     settings.set('notifications', e.target.checked);
   };
-  
+
   document.getElementById('analytics').onchange = (e) => {
     settings.set('analytics', e.target.checked);
   };
-  
+
   document.getElementById('autoPaste').onchange = (e) => {
     settings.set('autoPaste', e.target.checked);
   };
-  
+
   document.getElementById('maxReplies').oninput = (e) => {
     const value = parseInt(e.target.value);
     settings.set('maxReplies', value);
     document.getElementById('maxRepliesValue').textContent = value;
   };
-  
+
   document.getElementById('exportAnalytics').onclick = () => {
     const dataStr = JSON.stringify(analytics.events, null, 2);
-    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
     link.href = url;
@@ -1474,7 +1474,7 @@ function showSettingsPanel() {
     link.click();
     URL.revokeObjectURL(url);
   };
-  
+
   // Authentication buttons
   document.getElementById('loginBtn').onclick = () => {
     panel.remove();
@@ -1485,7 +1485,7 @@ function showSettingsPanel() {
       showSimpleLoginModal();
     }
   };
-  
+
   document.getElementById('userInfoBtn').onclick = () => {
     panel.remove();
     if (window.geminiAuthUI) {
@@ -1508,14 +1508,14 @@ function showSettingsPanel() {
 // === Analytics Panel for Discord
 function showAnalyticsPanel() {
   console.log('📊 Discord showAnalyticsPanel called');
-  
+
   // Remove existing panel if any
   const existingPanel = document.querySelector('.gemini-analytics-panel');
   if (existingPanel) {
     console.log('🗑️ Removing existing Discord analytics panel');
     existingPanel.remove();
   }
-  
+
   console.log('🆕 Creating new Discord analytics panel');
 
   const panel = document.createElement('div');
@@ -1540,7 +1540,7 @@ function showAnalyticsPanel() {
   `;
 
   const stats = analytics.getStats();
-  
+
   panel.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h2 style="margin: 0; color: ${CONFIG.THEME.text}; font-size: 20px;">📊 Analytics & Settings</h2>
@@ -1677,30 +1677,30 @@ function showAnalyticsPanel() {
 
   // Event listeners
   panel.querySelector('.close-analytics').onclick = () => panel.remove();
-  
+
   // Settings event listeners
   panel.querySelector('#showPreview').onchange = (e) => {
     settings.set('showPreview', e.target.checked);
   };
-  
+
   panel.querySelector('#notifications').onchange = (e) => {
     settings.set('notifications', e.target.checked);
   };
-  
+
   panel.querySelector('#analytics').onchange = (e) => {
     settings.set('analytics', e.target.checked);
   };
-  
+
   panel.querySelector('#autoPaste').onchange = (e) => {
     settings.set('autoPaste', e.target.checked);
   };
-  
+
   panel.querySelector('#maxReplies').oninput = (e) => {
     const value = parseInt(e.target.value);
     settings.set('maxReplies', value);
     panel.querySelector('#maxRepliesValue').textContent = value;
   };
-  
+
   // Authentication buttons
   panel.querySelector('#loginBtn').onclick = () => {
     panel.remove();
@@ -1711,7 +1711,7 @@ function showAnalyticsPanel() {
       showSimpleLoginModal();
     }
   };
-  
+
   panel.querySelector('#userInfoBtn').onclick = () => {
     panel.remove();
     if (window.geminiAuthUI) {
@@ -1720,7 +1720,7 @@ function showAnalyticsPanel() {
       showNotification("Please login first using the Login/Register button.", "error");
     }
   };
-  
+
   panel.querySelector('.export-analytics').onclick = () => {
     const data = {
       settings: settings.settings,
@@ -1728,7 +1728,7 @@ function showAnalyticsPanel() {
       stats: stats,
       exportDate: new Date().toISOString()
     };
-    
+
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1736,13 +1736,13 @@ function showAnalyticsPanel() {
     a.download = `gemini-discord-analytics-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    
+
     showNotification("Analytics data exported!", "success");
   };
 
   document.body.appendChild(panel);
   console.log('✅ Discord Analytics panel appended to body');
-  
+
   // Close on escape
   const handleEscape = (e) => {
     if (e.key === 'Escape') {
@@ -1757,18 +1757,18 @@ function showAnalyticsPanel() {
 function debugMessageDetection(message) {
   console.log('=== Discord Message Debug ===');
   console.log('Message element:', message);
-  
+
   const { contentText, username } = extractMessagePieces(message);
   console.log('Extracted content:', contentText);
   console.log('Extracted username:', username);
-  
+
   // Test message selectors
   const selectors = [
     '[id^="chat-messages-"] > div',
     '[class*="message"]',
     '[data-list-item-id*="chat-messages"]'
   ];
-  
+
   selectors.forEach(selector => {
     try {
       const elements = document.querySelectorAll(selector);
@@ -1777,13 +1777,13 @@ function debugMessageDetection(message) {
       console.log(`Selector "${selector}": Error -`, e.message);
     }
   });
-  
+
   // Test nearby messages
   getNearbyReplies(message).then(replies => {
     console.log('Nearby replies found:', replies.length);
     console.log('Sample replies:', replies.slice(0, 3));
   });
-  
+
   showNotification("Debug info logged to console", "info");
   analytics.track('debug_triggered', { platform: 'discord' });
 }
@@ -1919,7 +1919,7 @@ function injectComposerToolbar() {
 // === Enhanced Initialization & CSS Animations
 async function initializeDiscordExtension() {
   console.log('🚀 Initializing Enhanced Gemini Discord Extension...');
-  
+
   // Add CSS animations
   const style = document.createElement('style');
   style.textContent = `
@@ -1959,15 +1959,15 @@ async function initializeDiscordExtension() {
 
   // Load project.json data first
   await loadProjectData();
-  
+
   // Load dynamic rooms then create global room selector
   await initRoomsFromUser();
   createGlobalRoomSelector();
-  
+
   // Add keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey && e.shiftKey) {
-      switch(e.key) {
+      switch (e.key) {
         case 'S':
           e.preventDefault();
           showSettingsPanel();
@@ -2005,7 +2005,7 @@ const messageObserver = new MutationObserver(() => {
 messageObserver.observe(document.body, { childList: true, subtree: true });
 
 const composerObserver = new MutationObserver(() => {
-  try { injectComposerToolbar(); } catch (_) {}
+  try { injectComposerToolbar(); } catch (_) { }
 });
 composerObserver.observe(document.body, { childList: true, subtree: true });
 

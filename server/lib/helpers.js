@@ -24,10 +24,7 @@ function estimateRequestTokens(prompt, roomData, userRoom) {
   return totalTokens;
 }
 
-function isOfflineError(error) {
-  const msg = (error && (error.message || error.toString())) || "";
-  return (error && error.code === "ConnectionRefused") || /Unable to connect|ECONNREFUSED|ENOTFOUND|fetch failed/i.test(msg);
-}
+
 
 function removeContractions(text) {
   if (!text) return text;
@@ -76,7 +73,6 @@ export {
   sanitizeText,
   estimateTokens,
   estimateRequestTokens,
-  isOfflineError,
   removeContractions,
 };
 
