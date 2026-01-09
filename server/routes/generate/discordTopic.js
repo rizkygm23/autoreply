@@ -3,38 +3,38 @@ import { sanitizeText, removeContractions } from "../../lib/helpers.js";
 import { generateReplyFromGrok } from "../../services/aiService.js";
 
 const COMMUNITY_VOCAB = {
-  cys: ["Cysors", "gmsor", "fam", "gm", "wen", "zk"],
-  mmt: ["MMT", "fam", "gm"],
-  fgo: ["Fogo", "gm", "fam"],
-  rialo: ["Rialo", "gm", "fam"],
-  fastTest: ["gm", "fam"],
+   cys: ["Cysors", "gmsor", "fam", "gm", "wen", "zk"],
+   mmt: ["MMT", "fam", "gm"],
+   fgo: ["Fogo", "gm", "fam"],
+   rialo: ["Rialo", "gm", "fam"],
+   fastTest: ["gm", "fam"],
 };
 
 const FALLBACK = {
-  cys: "How are you doing?",
-  mmt: "How are you doing?",
-  fgo: "What is good today?",
-  rialo: "How are you doing?",
-  fastTest: "How are you doing?",
-  default: "How are you doing?",
+   cys: "How are you doing?",
+   mmt: "How are you doing?",
+   fgo: "What is good today?",
+   rialo: "How are you doing?",
+   fastTest: "How are you doing?",
+   default: "How are you doing?",
 };
 
 function registerDiscordTopicRoute(app) {
-  app.post("/generate-topic", async (req, res) => {
-    const { roomId, hint = "", examples = [] } = req.body || {};
-    const spinner = startSpinner(`${req._id} /generate-topic`, "AI thinking");
+   app.post("/generate-topic", async (req, res) => {
+      const { roomId, hint = "", examples = [] } = req.body || {};
+      const spinner = startSpinner(`${req._id} /generate-topic`, "AI thinking");
 
-    try {
-      if (!roomId) {
-        spinner.stop(false, `${COLORS.red}bad request${COLORS.reset}`);
-        return res.status(400).json({ error: "roomId is required" });
-      }
+      try {
+         if (!roomId) {
+            spinner.stop(false, `${COLORS.red}bad request${COLORS.reset}`);
+            return res.status(400).json({ error: "roomId is required" });
+         }
 
-      const sample = (Array.isArray(examples) ? examples : []).slice(0, 10);
-      const sampleText = sample.map((m, i) => `${i + 1}. ${m.username}: ${sanitizeText(m.reply || "")}`).join("\n");
-      const vocab = COMMUNITY_VOCAB[roomId] || ["gm", "fam"];
+         const sample = (Array.isArray(examples) ? examples : []).slice(0, 10);
+         const sampleText = sample.map((m, i) => `${i + 1}. ${m.username}: ${sanitizeText(m.reply || "")}`).join("\n");
+         const vocab = COMMUNITY_VOCAB[roomId] || ["gm", "fam"];
 
-      const prompt = `
+         const prompt = `
 <system_configuration>
 <vocabulary_control>
        * RULE: USE GRADE 8 ENGLISH.
@@ -235,29 +235,29 @@ Specific Rules:
 - Do NOT output multiple options
 `.trim();
 
-      const raw = await generateReplyFromGrok(prompt);
+         const aiResponse = await generateReplyFromGrok(prompt);
 
-      let line = raw.replace(/[\r\n]+/g, " ").trim();
-      line = line.replace(/^["'`]+|["'`]+$/g, "");
-      line = line.replace(/[—-]+/g, " ");
-      line = line.replace(/\s+/g, " ").trim();
-      line = removeContractions(line);
+         let line = aiResponse.content.replace(/[\r\n]+/g, " ").trim();
+         line = line.replace(/^["'`]+|["'`]+$/g, "");
+         line = line.replace(/[—-]+/g, " ");
+         line = line.replace(/\s+/g, " ").trim();
+         line = removeContractions(line);
 
-      const wordCount = line ? line.split(/\s+/).length : 0;
-      const invalid = !line || /,/.test(line) || wordCount < 2 || wordCount > 8;
+         const wordCount = line ? line.split(/\s+/).length : 0;
+         const invalid = !line || /,/.test(line) || wordCount < 2 || wordCount > 8;
 
-      if (invalid) {
-        line = FALLBACK[roomId] || FALLBACK.default;
+         if (invalid) {
+            line = FALLBACK[roomId] || FALLBACK.default;
+         }
+
+         spinner.stop(true, `${COLORS.green}ok${COLORS.reset}`);
+         return res.json({ topic: line });
+      } catch (err) {
+         spinner.stop(false, `${COLORS.red}error${COLORS.reset}`);
+         logErr(`${COLORS.cyan}${req._id}${COLORS.reset} Error (/generate-topic): ${err?.message || err}`);
+         return res.status(500).json({ error: "Failed to generate topic" });
       }
-
-      spinner.stop(true, `${COLORS.green}ok${COLORS.reset}`);
-      return res.json({ topic: line });
-    } catch (err) {
-      spinner.stop(false, `${COLORS.red}error${COLORS.reset}`);
-      logErr(`${COLORS.cyan}${req._id}${COLORS.reset} Error (/generate-topic): ${err?.message || err}`);
-      return res.status(500).json({ error: "Failed to generate topic" });
-    }
-  });
+   });
 }
 
 export { registerDiscordTopicRoute };

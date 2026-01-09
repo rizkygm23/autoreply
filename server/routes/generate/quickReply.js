@@ -215,8 +215,8 @@ Output:
 One sentence reply only.
 `.trim();
 
-         const rawReply = await generateReplyFromGrok(prompt);
-         const reply = removeContractions(rawReply);
+         const aiResponse = await generateReplyFromGrok(prompt);
+         const reply = removeContractions(aiResponse.content);
          const elapsed = Date.now() - req._t0;
 
          if (!reply || reply.trim().length < 5) {

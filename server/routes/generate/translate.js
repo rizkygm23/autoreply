@@ -32,8 +32,8 @@ Output:
 English translation only.
 `.trim();
 
-      const rawTranslated = await generateReplyFromGrok(prompt);
-      const translated = removeContractions(rawTranslated);
+      const aiResponse = await generateReplyFromGrok(prompt);
+      const translated = removeContractions(aiResponse.content);
       spinner.stop(true, `${COLORS.green}ok${COLORS.reset}`);
       return res.json({ text: translated?.trim() || "" });
     } catch (err) {

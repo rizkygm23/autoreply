@@ -1,67 +1,194 @@
 # 🚀 Gemini Social Assistant Enhanced v2.0
 
-Advanced AI-powered Chrome extension for generating contextual replies on Twitter/X and Discord with modern UI, analytics, and smart features.
+Advanced AI-powered Chrome extension for generating contextual replies on Twitter/X and Discord using Grok AI (xAI).
+
+![Version](https://img.shields.io/badge/version-2.0.0-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Platform](https://img.shields.io/badge/platform-Chrome-yellow)
+
+## 📋 Table of Contents
+
+- [Features](#-features)
+- [Prerequisites](#-prerequisites)
+- [Installation](#-installation)
+  - [Server Setup](#1-server-setup)
+  - [Extension Setup](#2-extension-setup)
+- [Configuration](#%EF%B8%8F-configuration)
+- [Usage](#-usage)
+- [API Endpoints](#-api-endpoints)
+- [Room Personalities](#-room-personalities)
+- [Troubleshooting](#-troubleshooting)
+- [Contributing](#-contributing)
+- [License](#-license)
+
+---
 
 ## ✨ Features
 
 ### 🤖 AI-Powered Replies
 - **Contextual Generation**: Uses Grok AI to generate natural, contextual replies
-- **Room Personalities**: Different AI personalities for various communities (Rialo, Cysic, MMT, FGO, etc.)
-- **Smart Context**: Analyzes nearby replies and engagement metrics for better context
-- **Multiple Options**: Generate multiple reply alternatives to choose from
+- **Room Personalities**: Different AI personalities for various communities
+- **Smart Context**: Analyzes nearby replies and engagement metrics
+- **Multiple Options**: Generate multiple reply alternatives
 
 ### 🎨 Modern UI/UX
 - **Beautiful Interface**: Modern, responsive design with smooth animations
 - **Reply Preview**: Preview generated replies before posting
-- **Interactive Dropdowns**: Enhanced room selection with icons and descriptions
-- **Real-time Feedback**: Loading states, success/error notifications
 - **Dark Theme**: Optimized for Twitter/X and Discord dark themes
+- **Real-time Feedback**: Loading states, success/error notifications
 
-### 📊 Analytics & Insights
-- **Usage Tracking**: Track generation attempts, success rates, and room preferences
-- **Performance Metrics**: Monitor response times and error rates
-- **Data Export**: Export analytics data for analysis
-- **Real-time Stats**: View usage statistics in popup and settings
+### 📊 Analytics & Cost Tracking
+- **Token Usage**: Real-time token consumption tracking
+- **Cost Estimation**: See cost per request in terminal
+- **Usage Statistics**: Track generation attempts and success rates
 
-### ⚡ Smart Features
-- **Keyboard Shortcuts**: Quick access with Ctrl+Shift+G (Generate) and Ctrl+Shift+S (Settings)
-- **Auto-retry**: Automatic retry mechanism for failed requests
-- **Error Handling**: Comprehensive error handling with user-friendly messages
-- **Settings Panel**: Comprehensive settings with real-time preview
-- **Context Menu**: Right-click integration for quick actions
+### ⚡ Supported Platforms
+- Twitter/X
+- Discord
 
-### 🔧 Technical Improvements
-- **Enhanced API Client**: Robust API client with retry logic and timeout handling
-- **Memory Optimization**: Efficient memory usage and cleanup
-- **Performance Monitoring**: Built-in performance tracking
-- **Cross-platform**: Works on Twitter/X and Discord
-- **Service Worker**: Background processing for better performance
+---
 
-## 🚀 Installation
+## 📦 Prerequisites
 
-1. **Download the Extension**
-   ```bash
-   git clone https://github.com/yourusername/gemini-extension-enhanced.git
-   cd gemini-extension-enhanced
-   ```
+Before you begin, ensure you have the following installed:
 
-2. **Load in Chrome**
-   - Open Chrome and go to `chrome://extensions/`
-   - Enable "Developer mode"
-   - Click "Load unpacked" and select the extension folder
+| Requirement | Version | Download |
+|-------------|---------|----------|
+| **Bun** | Latest | [bun.sh](https://bun.sh) |
+| **Node.js** | 18+ | [nodejs.org](https://nodejs.org) (alternative to Bun) |
+| **Chrome** | Latest | [google.com/chrome](https://google.com/chrome) |
+| **xAI API Key** | - | [x.ai](https://x.ai) |
 
-3. **Configure Backend**
-   - Ensure your backend server is running at `https://autoreply-gt64.onrender.com`
-   - Set up your xAI API key in the server environment
+---
+
+## 🛠️ Installation
+
+### 1. Server Setup
+
+#### Step 1: Clone the Repository
+```bash
+git clone https://github.com/yourusername/auto-reply.git
+cd auto-reply
+```
+
+#### Step 2: Navigate to Server Directory
+```bash
+cd server
+```
+
+#### Step 3: Install Dependencies
+```bash
+# Using Bun (recommended)
+bun install
+
+# Or using npm
+npm install
+```
+
+#### Step 4: Configure Environment Variables
+```bash
+# Copy the example environment file
+cp env.example .env
+```
+
+Edit `.env` file with your configuration:
+```env
+# =============================================
+# Required Configuration
+# =============================================
+
+# xAI API Key (Get from https://x.ai)
+XAI_API_KEY=your_xai_api_key_here
+
+# Server Port
+PORT=3000
+
+# =============================================
+# Optional: Token System Configuration
+# =============================================
+
+# Free tokens for new users
+FREE_TOKENS=200000
+
+# Cost per action (in tokens)
+TOKEN_COST_GENERATE=100
+TOKEN_COST_QUICK=50
+TOKEN_COST_TOPIC=25
+TOKEN_COST_TRANSLATE=10
+TOKEN_COST_PARAPHRASE=10
+```
+
+#### Step 5: Start the Server
+```bash
+# Development mode (with hot reload)
+bun run dev
+
+# Or production mode
+bun run start
+
+# Or using npm
+npm run dev
+```
+
+You should see:
+```
+🚀 Server running on http://localhost:3000
+```
+
+---
+
+### 2. Extension Setup
+
+#### Step 1: Open Chrome Extensions
+1. Open Google Chrome
+2. Go to `chrome://extensions/`
+3. Enable **Developer mode** (toggle in top right)
+
+#### Step 2: Load the Extension
+1. Click **"Load unpacked"**
+2. Navigate to the `auto-reply` folder (root directory, NOT the server folder)
+3. Click **"Select Folder"**
+
+#### Step 3: Verify Installation
+- You should see "Gemini Social Assistant Enhanced" in your extensions list
+- The extension icon should appear in your Chrome toolbar
+
+#### Step 4: Configure Extension (Optional)
+1. Click the extension icon in the toolbar
+2. Configure your preferred settings
+3. Select your default room/community
+
+---
+
+## ⚙️ Configuration
+
+### Server Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `XAI_API_KEY` | Your xAI API key | Required |
+| `PORT` | Server port | `3000` |
+| `NODE_ENV` | Environment mode | `development` |
+
+### Extension Settings
+
+Access settings via the ⚙️ button or `Ctrl+Shift+S`:
+
+| Setting | Description |
+|---------|-------------|
+| Show Reply Preview | Enable/disable preview modal |
+| Enable Notifications | Show success/error notifications |
+| Max Replies to Analyze | Context collection depth (5-50) |
+
+---
 
 ## 🎯 Usage
 
 ### Twitter/X
 1. Navigate to any Twitter/X page
-2. Hover over any tweet to see the enhanced interface
+2. Hover over any tweet to see the AI interface
 3. Select your preferred room/community
-4. Click "💬 Generate" for preview or "⚡ Quick" for direct insertion
-5. Use keyboard shortcuts for faster workflow
+4. Click **"💬 Generate"** for preview or **"⚡ Quick"** for direct insertion
 
 ### Discord
 1. Go to any Discord channel
@@ -70,139 +197,143 @@ Advanced AI-powered Chrome extension for generating contextual replies on Twitte
 4. Generate replies, topics, or use translation tools
 
 ### Keyboard Shortcuts
-- `Ctrl+Shift+G`: Quick generate on focused tweet
-- `Ctrl+Shift+S`: Open settings panel
-- `Escape`: Close any open modal
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+Shift+G` | Quick generate on focused tweet |
+| `Ctrl+Shift+S` | Open settings panel |
+| `Escape` | Close any open modal |
 
-## ⚙️ Configuration
+---
 
-### Settings Panel
-Access via the ⚙️ button or `Ctrl+Shift+S`:
+## 📡 API Endpoints
 
-- **General Settings**
-  - Show Reply Preview: Enable/disable preview modal
-  - Enable Notifications: Show success/error notifications
-  - Enable Analytics: Track usage data
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/generate` | POST | Generate Twitter/X replies |
+| `/generate-quote` | POST | Generate quote tweet comments |
+| `/generate-discord` | POST | Generate Discord replies |
+| `/generate-quick` | POST | Generate quick replies |
+| `/generate-topic` | POST | Generate conversation topics |
+| `/generate-translate` | POST | Indonesian → English translation |
+| `/generate-parafrase` | POST | Improve/paraphrase English text |
 
-- **Performance Settings**
-  - Max Replies to Analyze: Adjust context collection (5-50)
-  - Auto-retry attempts: Configure retry behavior
-
-- **Analytics Dashboard**
-  - View usage statistics
-  - Export data for analysis
-  - Reset analytics data
-
-### Room Personalities
-Each room has its own AI personality:
-
-- **🏛️ Rialo**: Professional, business-focused
-- **💡 Lighter**: Creative, innovative
-- **🚀 MMT**: Technical, development-focused
-- **🎯 Cysic**: Community-focused with custom emojis
-- **⚡ Mega**: Fast-paced, energetic
-- **🎮 FGO**: Gaming-focused
-- **🏘️ Town**: General community
-
-## 🔧 Development
-
-### Project Structure
-```
-├── content.js              # Twitter/X integration
-├── content-discord.js      # Discord integration
-├── background.js           # Service worker
-├── popup.html              # Extension popup
-├── popup.js                # Popup functionality
-├── manifest.json           # Extension manifest
-├── server/                 # Backend server
-│   ├── index.js           # Express server
-│   ├── package.json       # Dependencies
-│   └── data/              # Room data storage
-└── README.md              # Documentation
+### Request Example
+```bash
+curl -X POST http://localhost:3000/generate-discord \
+  -H "Content-Type: application/json" \
+  -d '{
+    "caption": "Hello everyone!",
+    "roomId": "cys",
+    "username": "user123"
+  }'
 ```
 
-### Key Classes
-- `ExtensionSettings`: Manages user preferences
-- `Analytics`: Tracks usage and performance
-- `ApiClient`: Handles API communication with retry logic
-- `CONFIG`: Centralized configuration
+---
 
-### API Endpoints
-- `POST /generate`: Generate Twitter/X replies
-- `POST /generate-discord`: Generate Discord replies
-- `POST /generate-topic`: Generate conversation topics
-- `POST /generate-translate`: Indonesian to English translation
-- `POST /generate-parafrase`: Improve English text
+## 🏠 Room Personalities
 
-## 🚀 Performance
+Each room has its own AI personality and style:
 
-### Optimizations
-- **Lazy Loading**: Components load only when needed
-- **Memory Management**: Automatic cleanup of unused elements
-- **Efficient Observers**: Optimized DOM mutation observers
-- **Caching**: Smart caching of settings and analytics
-- **Debouncing**: Prevents excessive API calls
+| Room | Icon | Description |
+|------|------|-------------|
+| **Rialo** | 🏛️ | Professional, business-focused |
+| **Cysic** | 🎯 | Community-focused with custom emojis |
+| **MMT** | 🚀 | Technical, development-focused |
+| **FGO** | 🎮 | Gaming-focused |
+| **Mega** | ⚡ | Fast-paced, energetic |
+| **Town** | 🏘️ | General community |
 
-### Monitoring
-- Real-time performance tracking
-- Error rate monitoring
-- Response time analytics
-- Memory usage optimization
+---
 
-## 🔒 Privacy & Security
+## 💰 Cost Estimation
 
-- **Local Storage**: All data stored locally in browser
-- **No Tracking**: No external tracking or analytics
-- **Secure API**: HTTPS-only communication
-- **Data Control**: Users can export/delete their data
-- **Open Source**: Fully transparent codebase
+The server logs token usage and estimated costs for each request:
+
+```
+[Grok] 📊 Tokens: in:1523 | out:12 | total:1535
+[Grok] 💰 Cost: in:$304.60µ | out:$6.00µ | total:$310.60µ
+```
+
+### xAI Pricing (grok-3-fast)
+| Type | Price |
+|------|-------|
+| Input | $0.20 / 1M tokens |
+| Output | $0.50 / 1M tokens |
+
+---
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
-1. **Extension not loading**: Check if developer mode is enabled
-2. **API errors**: Verify backend server is running
-3. **UI not appearing**: Refresh the page and check console
-4. **Settings not saving**: Check browser storage permissions
+
+| Issue | Solution |
+|-------|----------|
+| Extension not loading | Check if Developer mode is enabled |
+| API errors | Verify server is running and API key is valid |
+| UI not appearing | Refresh the page and check console for errors |
+| CORS errors | Ensure server has proper CORS configuration |
 
 ### Debug Mode
-Enable debug logging by opening browser console and looking for:
+Check browser console for logs:
 ```
 [Gemini Extension] ✅ Enhanced version initialized successfully!
 ```
 
-## 📈 Roadmap
+Check server terminal for AI logs:
+```
+[Grok] Sending request to xAI...
+[Grok] Success!
+[Grok] 📊 Tokens: in:1523 | out:12 | total:1535
+```
 
-### v2.1 (Planned)
-- [ ] Custom room creation
-- [ ] Advanced AI model selection
-- [ ] Reply templates
-- [ ] Sentiment analysis
-- [ ] Multi-language support
+---
 
-### v2.2 (Future)
-- [ ] Team collaboration features
-- [ ] Advanced analytics dashboard
-- [ ] Integration with more platforms
-- [ ] AI model fine-tuning
+## 📁 Project Structure
+
+```
+auto-reply/
+├── 📄 manifest.json          # Chrome extension manifest
+├── 📄 content.js             # Twitter/X content script
+├── 📄 content-discord.js     # Discord content script
+├── 📄 background.js          # Service worker
+├── 📄 popup.html             # Extension popup UI
+├── 📄 popup.js               # Popup functionality
+├── 📄 icon.png               # Extension icon
+│
+└── 📁 server/                # Backend server
+    ├── 📄 index.js           # Express server entry
+    ├── 📄 package.json       # Dependencies
+    ├── 📄 env.example        # Environment template
+    ├── 📁 routes/            # API route handlers
+    │   └── 📁 generate/      # Generation endpoints
+    ├── 📁 services/          # AI service layer
+    ├── 📁 lib/               # Helper utilities
+    └── 📁 data/              # Room data storage
+```
+
+---
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
 
 ## 📄 License
 
-MIT License - see LICENSE file for details
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
 
 ## 🙏 Acknowledgments
 
-- Built with Grok AI (xAI)
-- Inspired by the need for better social media interactions
-- Thanks to the open-source community
+- Built with [Grok AI](https://x.ai) by xAI
+- [Bun](https://bun.sh) - Fast JavaScript runtime
+- [Express.js](https://expressjs.com) - Web framework
 
 ---
 

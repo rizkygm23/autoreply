@@ -5,32 +5,32 @@ import { DATA_DIR, saveEntryToJSON, loadJSON } from "../../lib/storage.js";
 import { generateReplyFromGrok } from "../../services/aiService.js";
 
 function registerTwitterQuoteRoute(app) {
-  app.post("/generate-quote", async (req, res) => {
-    const { caption, roomId, komentar = [] } = req.body;
+   app.post("/generate-quote", async (req, res) => {
+      const { caption, roomId, komentar = [] } = req.body;
 
-    if (!caption || !roomId) {
-      logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing caption/roomId on /generate-quote`);
-      return res.status(400).json({ error: "caption and roomId are required" });
-    }
+      if (!caption || !roomId) {
+         logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing caption/roomId on /generate-quote`);
+         return res.status(400).json({ error: "caption and roomId are required" });
+      }
 
-    const jsonPath = path.join(DATA_DIR, `${roomId}.json`);
-    logInfo(`${COLORS.cyan}${req._id}${COLORS.reset} 💬 Quote Retweet (Twitter): ${COLORS.gray}${komentar.length} items${COLORS.reset}`);
+      const jsonPath = path.join(DATA_DIR, `${roomId}.json`);
+      logInfo(`${COLORS.cyan}${req._id}${COLORS.reset} 💬 Quote Retweet (Twitter): ${COLORS.gray}${komentar.length} items${COLORS.reset}`);
 
-    const newEntry = { caption, komentar };
-    saveEntryToJSON(jsonPath, newEntry);
+      const newEntry = { caption, komentar };
+      saveEntryToJSON(jsonPath, newEntry);
 
-    const history = loadJSON(jsonPath);
-    const historyText = history
-      .slice(-20)
-      .map((entry, idx) => {
-        const cleanedCaption = sanitizeText(entry.caption);
-        const kom =
-          entry.komentar?.map((k, i) => `${i + 1}. @${k.username}: ${sanitizeText(k.reply)}`).join("\n") || "";
-        return `## Example ${idx + 1}\nCaption: "${cleanedCaption}"\nReplies:\n${kom}`;
-      })
-      .join("\n\n");
+      const history = loadJSON(jsonPath);
+      const historyText = history
+         .slice(-20)
+         .map((entry, idx) => {
+            const cleanedCaption = sanitizeText(entry.caption);
+            const kom =
+               entry.komentar?.map((k, i) => `${i + 1}. @${k.username}: ${sanitizeText(k.reply)}`).join("\n") || "";
+            return `## Example ${idx + 1}\nCaption: "${cleanedCaption}"\nReplies:\n${kom}`;
+         })
+         .join("\n\n");
 
-    const prompt = `
+      const prompt = `
 <system_configuration>
 <vocabulary_control>
        * RULE: USE GRADE 8 ENGLISH.
@@ -233,27 +233,27 @@ Output:
 Quote retweet comment only.
 `;
 
-    const spinner = startSpinner(`${req._id} /generate-quote`, "AI thinking");
-    try {
-      const rawReply = await generateReplyFromGrok(prompt);
-      const reply = removeContractions(rawReply);
-      const elapsed = Date.now() - req._t0;
+      const spinner = startSpinner(`${req._id} /generate-quote`, "AI thinking");
+      try {
+         const aiResponse = await generateReplyFromGrok(prompt);
+         const reply = removeContractions(aiResponse.content);
+         const elapsed = Date.now() - req._t0;
 
-      if (!reply || reply.trim().length < 5 || reply.includes(caption.trim())) {
-        spinner.stop(false, `${COLORS.red}invalid reply${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
-        return res.status(500).json({ error: "Reply not valid" });
+         if (!reply || reply.trim().length < 5 || reply.includes(caption.trim())) {
+            spinner.stop(false, `${COLORS.red}invalid reply${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
+            return res.status(500).json({ error: "Reply not valid" });
+         }
+
+         spinner.stop(true, `${COLORS.green}ok${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
+         logOk(`${COLORS.cyan}${req._id}${COLORS.reset} Quote retweet: ${COLORS.gray}"${reply.trim()}"${COLORS.reset}`);
+         res.json({ reply });
+      } catch (err) {
+         const elapsed = Date.now() - req._t0;
+         spinner.stop(false, `${COLORS.red}error${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
+         logErr(`${COLORS.cyan}${req._id}${COLORS.reset} Error (Quote): ${err?.message || err}`);
+         res.status(500).json({ error: "Gagal generate quote retweet" });
       }
-
-      spinner.stop(true, `${COLORS.green}ok${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
-      logOk(`${COLORS.cyan}${req._id}${COLORS.reset} Quote retweet: ${COLORS.gray}"${reply.trim()}"${COLORS.reset}`);
-      res.json({ reply });
-    } catch (err) {
-      const elapsed = Date.now() - req._t0;
-      spinner.stop(false, `${COLORS.red}error${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
-      logErr(`${COLORS.cyan}${req._id}${COLORS.reset} Error (Quote): ${err?.message || err}`);
-      res.status(500).json({ error: "Gagal generate quote retweet" });
-    }
-  });
+   });
 }
 
 export { registerTwitterQuoteRoute };

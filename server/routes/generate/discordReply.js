@@ -257,13 +257,20 @@ New message from ${username || 'User'}: "${caption}"
 Specific Rules:
 - Emojis allowed only if they feel natural and match this set: ${JSON.stringify(kodeEmoji)}.
 - Do not copy the message or conversation history.
-- If a username is available, you can optionally address them by name (e.g. "gm [name]" or "[name] makes a good point"), but keep it subtle and not every time.
+- USERNAME USAGE RULE (IMPORTANT):
+  * Only use the username in these specific contexts:
+    1. GREETINGS: "gm ${username ? username : ''}", "morning ${username ? username : ''}", "yo ${username ? username : ''}"
+    2. FAREWELLS: "catch you later ${username ? username : ''}", "see ya ${username ? username : ''}", "later ${username ? username : ''}"
+    3. ADDRESSING/SAPAAN: "hey ${username ? username : ''}", "thanks ${username ? username : ''}", "nice one ${username ? username : ''}", "true ${username ? username : ''}"
+  * DO NOT use the username in the MIDDLE of sentences (e.g. NEVER say "${username ? username : ''} makes a good point" or "I agree with ${username ? username : ''}")
+  * Username should only appear at the START or END of a short reply, not in analytical/conversational statements
+  * This keeps conversations natural and avoids sounding cringe
 `;
 
     const spinner = startSpinner(`${req._id} /generate-discord`, "AI thinking");
     try {
-      const rawReply = await generateReplyFromGrok(prompt);
-      const reply = removeContractions(rawReply);
+      const aiResponse = await generateReplyFromGrok(prompt);
+      const reply = removeContractions(aiResponse.content);
       const elapsed = Date.now() - req._t0;
 
       const trimmed = reply?.trim() || "";

@@ -35,8 +35,8 @@ Output:
 The rewritten sentence only.
 `.trim();
 
-      const rawImproved = await generateReplyFromGrok(prompt);
-      const improved = removeContractions(rawImproved);
+      const aiResponse = await generateReplyFromGrok(prompt);
+      const improved = removeContractions(aiResponse.content);
       spinner.stop(true, `${COLORS.green}ok${COLORS.reset}`);
       return res.json({ text: improved?.trim() || "" });
     } catch (err) {
