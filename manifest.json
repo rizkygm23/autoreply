@@ -1,45 +1,58 @@
 {
   "manifest_version": 3,
-  "name": "Gemini Social Assistant Enhanced",
-  "version": "2.0.0",
-  "description": "Advanced AI-powered auto-reply extension with analytics, previews, and smart features for Twitter/X and Discord",
+  "name": "Gemini Social Assistant",
+  "version": "2.1.0",
+  "description": "AI-powered auto-reply extension for Twitter/X and Discord - No login required!",
   "permissions": [
-    "activeTab", 
-    "scripting", 
-    "storage",
-    "notifications"
+    "activeTab",
+    "scripting",
+    "storage"
   ],
   "host_permissions": [
     "https://twitter.com/*",
     "https://x.com/*",
     "https://discord.com/channels/*",
-    "https://autoreply-gt64.onrender.com/*"
+    "http://localhost:3000/*",
+    "<all_urls>"
   ],
   "content_scripts": [
     {
-      "matches": ["https://x.com/*", "https://twitter.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://x.com/*",
+        "https://twitter.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_end",
       "all_frames": false
     },
     {
-      "matches": ["https://discord.com/channels/*"],
-      "js": ["content-discord.js"],
+      "matches": [
+        "https://discord.com/channels/*"
+      ],
+      "js": [
+        "content-discord.js"
+      ],
       "run_at": "document_end",
       "all_frames": false
     }
   ],
   "action": {
-    "default_title": "Gemini Social Assistant Enhanced",
-    "default_popup": "popup.html"
+    "default_title": "Gemini Social Assistant"
   },
   "background": {
     "service_worker": "background.js"
   },
   "web_accessible_resources": [
     {
-      "resources": ["icon.png", "auth-helper.js", "project.json"],
-      "use_dynamic_url": true
+      "resources": [
+        "icon.png",
+        "project.json"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "icons": {

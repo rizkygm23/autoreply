@@ -11,11 +11,49 @@ const openai = new OpenAI({
   baseURL: "https://api.x.ai/v1",
 });
 
+// Check AI connection on startup
+async function checkAIConnection() {
+  console.log("\x1b[36m[AI Check]\x1b[0m Checking xAI API connection...");
+
+  if (!process.env.XAI_API_KEY) {
+    console.log("\x1b[31m[AI Check] ❌ XAI_API_KEY not found in .env file!\x1b[0m");
+    console.log("\x1b[33m[AI Check] Please add XAI_API_KEY=your_key_here to .env\x1b[0m");
+    return false;
+  }
+
+  try {
+    const startTime = Date.now();
+    const completion = await openai.chat.completions.create({
+      model: "grok-3-fast",
+      messages: [{ role: "user", content: "Hi" }],
+      max_tokens: 5,
+    });
+    const elapsed = Date.now() - startTime;
+
+    if (completion && completion.choices && completion.choices[0]) {
+      console.log(`\x1b[32m[AI Check] ✅ xAI API connected successfully! (${elapsed}ms)\x1b[0m`);
+      console.log(`\x1b[90m[AI Check] Model: grok-3-fast | Response: "${completion.choices[0].message.content}"\x1b[0m`);
+      return true;
+    } else {
+      console.log("\x1b[31m[AI Check] ❌ Unexpected response from xAI\x1b[0m");
+      return false;
+    }
+  } catch (error) {
+    console.log(`\x1b[31m[AI Check] ❌ Failed to connect to xAI: ${error.message}\x1b[0m`);
+    if (error.message.includes("401") || error.message.includes("Unauthorized")) {
+      console.log("\x1b[33m[AI Check] ⚠️ Invalid API key. Please check your XAI_API_KEY\x1b[0m");
+    } else if (error.message.includes("ENOTFOUND") || error.message.includes("network")) {
+      console.log("\x1b[33m[AI Check] ⚠️ Network error. Check your internet connection\x1b[0m");
+    }
+    return false;
+  }
+}
+
 async function generateReplyFromGrok(prompt) {
   try {
     console.log("[Grok] Sending request to xAI...");
     const completion = await openai.chat.completions.create({
-      model: "grok-4-1-fast-non-reasoning",
+      model: "grok-3-fast",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.7,
     });
@@ -58,4 +96,5 @@ async function generateReplyFromGrok(prompt) {
   }
 }
 
-export { openai, generateReplyFromGrok };
+export { openai, generateReplyFromGrok, checkAIConnection };
+

@@ -1,21 +1,10 @@
-// content-discord.js - Enhanced Discord Integration
+// content-discord.js - Discord Integration (No Auth Required)
 
-// === Load Authentication Helper ===
-const authScript = document.createElement('script');
-authScript.src = chrome.runtime.getURL('auth-helper.js');
-authScript.onload = () => {
-  console.log('[Gemini Discord] Auth helper loaded successfully');
-};
-authScript.onerror = () => {
-  console.error('[Gemini Discord] Failed to load auth helper');
-};
-document.head.appendChild(authScript);
-
-// === Enhanced Configuration
+// === Configuration ===
 const CONFIG = {
-  ROOMS: [], // Will be loaded from project.json
+  ROOMS: [],
   MAX_REPLIES: 20,
-  API_BASE_URL: "http://localhost:3000",
+  API_BASE_URL: "http://localhost:3000", // Default, will be loaded from project.json
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
   THEME: {
@@ -34,8 +23,9 @@ const CONFIG = {
 let projectData = null;
 let roomInfoMap = {};
 
-// Embedded fallback data (from project.json)
+// Embedded fallback data
 const FALLBACK_PROJECT_DATA = {
+  "apiBaseUrl": "http://localhost:3000",
   "rooms": [
     { "id": "rialo", "icon": "🏛️", "name": "Rialo", "desc": "Rialo Community" },
     { "id": "lighter", "icon": "💡", "name": "Lighter", "desc": "Lighter Community" },
@@ -49,8 +39,14 @@ const FALLBACK_PROJECT_DATA = {
   ]
 };
 
-// Process project data into CONFIG.ROOMS and roomInfoMap
+// Process project data into CONFIG
 function processProjectData(data) {
+  // Load API URL from project.json
+  if (data.apiBaseUrl) {
+    CONFIG.API_BASE_URL = data.apiBaseUrl;
+    console.log('[Gemini Discord] API URL loaded:', CONFIG.API_BASE_URL);
+  }
+
   if (data.rooms && Array.isArray(data.rooms)) {
     CONFIG.ROOMS = data.rooms.map(room => room.id);
 
@@ -64,7 +60,7 @@ function processProjectData(data) {
       };
     });
 
-    console.log('[Gemini Discord] Loaded', CONFIG.ROOMS.length, 'rooms:', CONFIG.ROOMS);
+    console.log('[Gemini Discord] Loaded', CONFIG.ROOMS.length, 'rooms');
     return true;
   }
   return false;
@@ -74,8 +70,6 @@ function processProjectData(data) {
 async function loadProjectData() {
   try {
     const url = chrome.runtime.getURL('project.json');
-    console.log('[Gemini Discord] Attempting to load project.json from:', url);
-
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -84,16 +78,14 @@ async function loadProjectData() {
     projectData = await response.json();
 
     if (processProjectData(projectData)) {
-      console.log('[Gemini Discord] ✅ Successfully loaded project.json');
+      console.log('[Gemini Discord] ✅ project.json loaded successfully');
       return;
     } else {
       throw new Error('Invalid project.json structure');
     }
   } catch (error) {
     console.warn('[Gemini Discord] ⚠️ Failed to load project.json:', error.message);
-    console.log('[Gemini Discord] Using embedded fallback data');
-
-    // Use embedded fallback data
+    console.log('[Gemini Discord] Using fallback data');
     projectData = FALLBACK_PROJECT_DATA;
     processProjectData(projectData);
   }
@@ -494,7 +486,7 @@ function showSimpleLoginModal() {
 
     try {
       console.log('[Gemini Discord] Attempting login for:', email);
-      const response = await fetch('https://autoreply-gt64.onrender.com/auth/login', {
+      const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -563,7 +555,7 @@ function showSimpleLoginModal() {
     registerBtn.disabled = true;
 
     try {
-      const response = await fetch('https://autoreply-gt64.onrender.com/auth/register', {
+      const response = await fetch(`${CONFIG.API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -1213,7 +1205,7 @@ function addReplyButtonToMessage(message) {
       const nearby = await getNearbyReplies(message);
       const examples = nearby.slice(0, 10);
 
-      const res = await fetch("https://autoreply-gt64.onrender.com/generate-topic", {
+      const res = await fetch(`${CONFIG.API_BASE_URL}/generate-topic`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomId, hint, examples }),
@@ -1253,7 +1245,7 @@ function addReplyButtonToMessage(message) {
     if (!text) return alert("Isi dulu teks yang mau diterjemahkan.");
     setBtnLoading(translateBtn, true);
     try {
-      const res = await fetch("https://autoreply-gt64.onrender.com/generate-translate", {
+      const res = await fetch(`${CONFIG.API_BASE_URL}/generate-translate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
@@ -1285,7 +1277,7 @@ function addReplyButtonToMessage(message) {
     if (!text) return alert("Isi dulu teks yang mau diperbaiki.");
     setBtnLoading(paraphraseBtn, true);
     try {
-      const res = await fetch("https://autoreply-gt64.onrender.com/generate-parafrase", {
+      const res = await fetch(`${CONFIG.API_BASE_URL}/generate-parafrase`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),

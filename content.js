@@ -1,26 +1,15 @@
-// content.js - Enhanced Auto Reply Extension
+// content.js - Auto Reply Extension (No Auth Required)
 
-// === Load Authentication Helper ===
-const authScript = document.createElement('script');
-authScript.src = chrome.runtime.getURL('auth-helper.js');
-authScript.onload = () => {
-  console.log('[Gemini] Auth helper loaded successfully');
-};
-authScript.onerror = () => {
-  console.error('[Gemini] Failed to load auth helper');
-};
-document.head.appendChild(authScript);
-
-// === Enhanced Configuration
+// === Configuration ===
 const CONFIG = {
-  ROOMS: [], // Will be loaded from project.json
+  ROOMS: [],
   MAX_REPLIES: 20,
-  API_BASE_URL: "http://localhost:3000",
+  API_BASE_URL: "http://localhost:3000", // Default, will be loaded from project.json
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
   THEME: {
     primary: "#1d9bf0",
-    secondary: "#15202b", 
+    secondary: "#15202b",
     accent: "#1d9bf033",
     text: "#e7e9ea",
     border: "#2f3336",
@@ -34,8 +23,9 @@ const CONFIG = {
 let projectData = null;
 let roomInfoMap = {};
 
-// Embedded fallback data (from project.json)
+// Embedded fallback data
 const FALLBACK_PROJECT_DATA = {
+  "apiBaseUrl": "http://localhost:3000",
   "rooms": [
     { "id": "rialo", "icon": "🏛️", "name": "Rialo", "desc": "Rialo Community" },
     { "id": "lighter", "icon": "💡", "name": "Lighter", "desc": "Lighter Community" },
@@ -49,11 +39,17 @@ const FALLBACK_PROJECT_DATA = {
   ]
 };
 
-// Process project data into CONFIG.ROOMS and roomInfoMap
+// Process project data into CONFIG
 function processProjectData(data) {
+  // Load API URL from project.json
+  if (data.apiBaseUrl) {
+    CONFIG.API_BASE_URL = data.apiBaseUrl;
+    console.log('[Gemini] API URL loaded:', CONFIG.API_BASE_URL);
+  }
+
   if (data.rooms && Array.isArray(data.rooms)) {
     CONFIG.ROOMS = data.rooms.map(room => room.id);
-    
+
     // Build roomInfoMap for quick lookup
     roomInfoMap = {};
     data.rooms.forEach(room => {
@@ -63,8 +59,8 @@ function processProjectData(data) {
         desc: room.desc || `${room.name || room.id} Community`
       };
     });
-    
-    console.log('[Gemini Twitter] Loaded', CONFIG.ROOMS.length, 'rooms:', CONFIG.ROOMS);
+
+    console.log('[Gemini Twitter] Loaded', CONFIG.ROOMS.length, 'rooms');
     return true;
   }
   return false;
@@ -74,26 +70,22 @@ function processProjectData(data) {
 async function loadProjectData() {
   try {
     const url = chrome.runtime.getURL('project.json');
-    console.log('[Gemini Twitter] Attempting to load project.json from:', url);
-    
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    
+
     projectData = await response.json();
-    
+
     if (processProjectData(projectData)) {
-      console.log('[Gemini Twitter] ✅ Successfully loaded project.json');
+      console.log('[Gemini Twitter] ✅ project.json loaded successfully');
       return;
     } else {
       throw new Error('Invalid project.json structure');
     }
   } catch (error) {
     console.warn('[Gemini Twitter] ⚠️ Failed to load project.json:', error.message);
-    console.log('[Gemini Twitter] Using embedded fallback data');
-    
-    // Use embedded fallback data
+    console.log('[Gemini Twitter] Using fallback data');
     projectData = FALLBACK_PROJECT_DATA;
     processProjectData(projectData);
   }
@@ -112,7 +104,7 @@ function getRoomInfo(roomId) {
   return roomInfoMap[roomId] || { icon: "💬", name: roomId, desc: `${roomId} Community` };
 }
 
-async function initRoomsFromUser() {}
+async function initRoomsFromUser() { }
 
 // === Enhanced Storage & Settings
 class ExtensionSettings {
@@ -188,7 +180,7 @@ class Analytics {
 
   track(event, data = {}) {
     if (!settings.get('analytics')) return;
-    
+
     const eventData = {
       timestamp: Date.now(),
       event,
@@ -196,14 +188,14 @@ class Analytics {
       url: window.location.href,
       userAgent: navigator.userAgent
     };
-    
+
     this.events.push(eventData);
-    
+
     // Keep only last 1000 events
     if (this.events.length > 1000) {
       this.events = this.events.slice(-1000);
     }
-    
+
     this.saveEvents();
   }
 
@@ -211,10 +203,10 @@ class Analytics {
     const now = Date.now();
     const last24h = now - (24 * 60 * 60 * 1000);
     const last7d = now - (7 * 24 * 60 * 60 * 1000);
-    
+
     const recent = this.events.filter(e => e.timestamp > last24h);
     const weekly = this.events.filter(e => e.timestamp > last7d);
-    
+
     return {
       total: this.events.length,
       last24h: recent.length,
@@ -247,50 +239,50 @@ class ApiClient {
       headers: { "Content-Type": "application/json" },
       timeout: 30000
     };
-    
+
     const requestOptions = { ...defaultOptions, ...options };
-    
+
     try {
       analytics.track('api_request_start', { endpoint, retryCount });
-      
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), requestOptions.timeout);
-      
+
       const response = await fetch(url, {
         ...requestOptions,
         signal: controller.signal
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
       analytics.track('api_request_success', { endpoint, retryCount });
-      
+
       return data;
     } catch (error) {
-      analytics.track('api_request_error', { 
-        endpoint, 
-        retryCount, 
-        error: error.message 
+      analytics.track('api_request_error', {
+        endpoint,
+        retryCount,
+        error: error.message
       });
-      
+
       if (retryCount < CONFIG.RETRY_ATTEMPTS && this.shouldRetry(error)) {
         await this.delay(CONFIG.RETRY_DELAY * (retryCount + 1));
         return this.request(endpoint, options, retryCount + 1);
       }
-      
+
       throw error;
     }
   }
 
   shouldRetry(error) {
-    return error.name === 'AbortError' || 
-           error.message.includes('Failed to fetch') ||
-           error.message.includes('NetworkError');
+    return error.name === 'AbortError' ||
+      error.message.includes('Failed to fetch') ||
+      error.message.includes('NetworkError');
   }
 
   delay(ms) {
@@ -318,7 +310,7 @@ async function getTweetReplies(currentTweet) {
   ];
 
   let allArticles = [];
-  
+
   // Try each selector strategy
   for (const selector of replySelectors) {
     try {
@@ -390,9 +382,9 @@ async function getTweetReplies(currentTweet) {
       const likes = likeEl ? extractNumber(likeEl.innerText || likeEl.getAttribute('aria-label') || '0') : 0;
       const retweets = retweetEl ? extractNumber(retweetEl.innerText || retweetEl.getAttribute('aria-label') || '0') : 0;
 
-      replies.push({ 
-        username, 
-        reply: text, 
+      replies.push({
+        username,
+        reply: text,
         timestamp,
         likes,
         retweets,
@@ -408,10 +400,10 @@ async function getTweetReplies(currentTweet) {
 
   // Sort by engagement for better context
   replies.sort((a, b) => b.engagement - a.engagement);
-  
+
   console.log(`[Gemini] Total replies collected: ${replies.length}`);
-  
-  analytics.track('tweet_replies_collected', { 
+
+  analytics.track('tweet_replies_collected', {
     count: replies.length,
     maxReplies,
     selectorsUsed: replySelectors.length
@@ -423,10 +415,10 @@ async function getTweetReplies(currentTweet) {
 // === Debug Function for Reply Detection
 function debugReplyDetection() {
   console.log("=== GEMINI DEBUG: Reply Detection ===");
-  
+
   const allArticles = document.querySelectorAll("article");
   console.log(`Total articles found: ${allArticles.length}`);
-  
+
   allArticles.forEach((article, index) => {
     const textEl = article.querySelector("div[lang]") || article.querySelector("[data-testid='tweetText']");
     const usernameEl = article.querySelector("a[role='link'] span") || article.querySelector("[data-testid='User-Name'] span");
@@ -441,11 +433,11 @@ function debugReplyDetection() {
       console.log(`  Element:`, article);
     }
   });
-  
+
   // Check for specific reply indicators
   const replyButtons = document.querySelectorAll('[data-testid="reply"]');
   console.log(`Reply buttons found: ${replyButtons.length}`);
-  
+
   const replyArticles = document.querySelectorAll('article:has([data-testid="reply"])');
   console.log(`Articles with reply buttons: ${replyArticles.length}`);
 }
@@ -458,10 +450,10 @@ function extractNumber(text) {
   if (!text) return 0;
   const match = text.match(/(\d+(?:\.\d+)?[KMB]?)/);
   if (!match) return 0;
-  
+
   const num = parseFloat(match[1]);
   const suffix = match[1].slice(-1);
-  
+
   switch (suffix) {
     case 'K': return num * 1000;
     case 'M': return num * 1000000;
@@ -474,7 +466,7 @@ function extractNumber(text) {
 async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = true }) {
   const originalText = btn.innerText;
   const startTime = Date.now();
-  
+
   // Enhanced button states
   btn.innerText = "⏳ Generating...";
   btn.disabled = true;
@@ -483,7 +475,7 @@ async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = tru
 
   try {
     analytics.track('generate_start', { roomId, tweetLength: tweetText.length });
-    
+
     const komentar = await getTweetReplies(tweet);
 
     // Send to local API without authentication
@@ -501,7 +493,7 @@ async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = tru
         }
       })
     });
-    
+
     const data = await response.json();
 
     if (!response.ok) {
@@ -513,8 +505,8 @@ async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = tru
     const alternatives = data.alternatives || [];
     const generationTime = Date.now() - startTime;
 
-    analytics.track('generate_success', { 
-      roomId, 
+    analytics.track('generate_success', {
+      roomId,
       generationTime,
       replyLength: reply.length,
       alternativesCount: alternatives.length
@@ -528,7 +520,7 @@ async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = tru
 
     btn.innerText = "✅ Done!";
     btn.style.background = CONFIG.THEME.success;
-    
+
     if (settings.get('notifications')) {
       showNotification("Reply generated!", "success");
     }
@@ -537,9 +529,9 @@ async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = tru
     console.error("Gagal generate reply:", error);
     btn.innerText = "❌ Error";
     btn.style.background = CONFIG.THEME.error;
-    
-    analytics.track('generate_error', { 
-      roomId, 
+
+    analytics.track('generate_error', {
+      roomId,
       error: error.message,
       generationTime: Date.now() - startTime
     });
@@ -562,7 +554,7 @@ async function handleGenerate({ tweet, tweetText, roomId, btn, showPreview = tru
 async function handleGenerateQuote({ tweet, tweetText, roomId, btn, showPreview = true }) {
   const originalText = btn.innerText;
   const startTime = Date.now();
-  
+
   // Enhanced button states
   btn.innerText = "⏳ Generating...";
   btn.disabled = true;
@@ -571,7 +563,7 @@ async function handleGenerateQuote({ tweet, tweetText, roomId, btn, showPreview 
 
   try {
     analytics.track('generate_quote_start', { roomId, tweetLength: tweetText.length });
-    
+
     const komentar = await getTweetReplies(tweet);
 
     // Send to local API for quote retweet
@@ -589,7 +581,7 @@ async function handleGenerateQuote({ tweet, tweetText, roomId, btn, showPreview 
         }
       })
     });
-    
+
     const data = await response.json();
 
     if (!response.ok) {
@@ -601,8 +593,8 @@ async function handleGenerateQuote({ tweet, tweetText, roomId, btn, showPreview 
     const alternatives = data.alternatives || [];
     const generationTime = Date.now() - startTime;
 
-    analytics.track('generate_quote_success', { 
-      roomId, 
+    analytics.track('generate_quote_success', {
+      roomId,
       generationTime,
       quoteLength: quote.length,
       alternativesCount: alternatives.length
@@ -616,7 +608,7 @@ async function handleGenerateQuote({ tweet, tweetText, roomId, btn, showPreview 
 
     btn.innerText = "✅ Done!";
     btn.style.background = CONFIG.THEME.success;
-    
+
     if (settings.get('notifications')) {
       showNotification("Quote retweet generated!", "success");
     }
@@ -625,9 +617,9 @@ async function handleGenerateQuote({ tweet, tweetText, roomId, btn, showPreview 
     console.error("Gagal generate quote retweet:", error);
     btn.innerText = "❌ Error";
     btn.style.background = CONFIG.THEME.error;
-    
-    analytics.track('generate_quote_error', { 
-      roomId, 
+
+    analytics.track('generate_quote_error', {
+      roomId,
       error: error.message,
       generationTime: Date.now() - startTime
     });
@@ -703,7 +695,7 @@ function showReplyPreview(tweet, reply, alternatives = [], roomId, isQuote = fal
   // Add event listeners
   preview.querySelector('.close-preview').onclick = () => preview.remove();
   preview.querySelector('.cancel-preview').onclick = () => preview.remove();
-  
+
   preview.querySelector('.use-reply').onclick = () => {
     if (isQuote) {
       insertQuoteDirectly(tweet, reply);
@@ -712,7 +704,7 @@ function showReplyPreview(tweet, reply, alternatives = [], roomId, isQuote = fal
     }
     preview.remove();
   };
-  
+
   preview.querySelector('.regenerate').onclick = () => {
     preview.remove();
     const btn = tweet.querySelector('.gemini-room-btn');
@@ -726,12 +718,12 @@ function showReplyPreview(tweet, reply, alternatives = [], roomId, isQuote = fal
       insertReplyDirectly(tweet, selectedReply);
       preview.remove();
     };
-    
+
     option.onmouseenter = () => {
       option.style.borderColor = CONFIG.THEME.primary;
       option.style.background = '#2a2a2a';
     };
-    
+
     option.onmouseleave = () => {
       option.style.borderColor = 'transparent';
       option.style.background = '#1a1a1a';
@@ -739,7 +731,7 @@ function showReplyPreview(tweet, reply, alternatives = [], roomId, isQuote = fal
   });
 
   document.body.appendChild(preview);
-  
+
   // Close on escape key
   const handleEscape = (e) => {
     if (e.key === 'Escape') {
@@ -760,7 +752,7 @@ function getTwitterReplyInputText() {
     '[data-testid="tweetTextarea_0"]',
     'div[contenteditable="true"][role="textbox"]'
   ];
-  
+
   for (const selector of selectors) {
     const input = document.querySelector(selector);
     if (input) {
@@ -770,7 +762,7 @@ function getTwitterReplyInputText() {
       }
     }
   }
-  
+
   // Fallback: try to find any visible textbox
   const allTextboxes = document.querySelectorAll('div[role="textbox"]');
   for (const textbox of allTextboxes) {
@@ -781,7 +773,7 @@ function getTwitterReplyInputText() {
       }
     }
   }
-  
+
   return '';
 }
 
@@ -789,17 +781,17 @@ function getTwitterReplyInputText() {
 async function insertReplyDirectly(tweet, reply) {
   const autoPaste = settings.get('autoPaste');
   const openComposer = settings.get('openComposer');
-  
+
   try {
     // Always copy to clipboard first
     await navigator.clipboard.writeText(reply);
-    
+
     // Open reply composer if enabled
     if (openComposer) {
       const replyBtn = tweet.querySelector('[data-testid="reply"]');
       if (replyBtn) {
         replyBtn.click();
-        
+
         // Auto-paste if enabled
         if (autoPaste) {
           setTimeout(() => {
@@ -807,29 +799,29 @@ async function insertReplyDirectly(tweet, reply) {
             if (input) {
               input.focus();
               input.innerText = reply;
-              
+
               // Trigger input event for Twitter's character counter
               const event = new Event('input', { bubbles: true });
               input.dispatchEvent(event);
             }
           }, 600);
-          
+
           if (settings.get('notifications')) {
             showNotification("Reply pasted automatically!", "success");
           }
-          
-          analytics.track('reply_auto_pasted', { 
+
+          analytics.track('reply_auto_pasted', {
             replyLength: reply.length,
-            autoPaste: true 
+            autoPaste: true
           });
         } else {
           if (settings.get('notifications')) {
             showNotification("Reply copied to clipboard! Paste it manually.", "success");
           }
-          
-          analytics.track('reply_copied', { 
+
+          analytics.track('reply_copied', {
             replyLength: reply.length,
-            autoPaste: false 
+            autoPaste: false
           });
         }
       } else {
@@ -843,21 +835,21 @@ async function insertReplyDirectly(tweet, reply) {
       if (settings.get('notifications')) {
         showNotification("Reply copied to clipboard!", "success");
       }
-      
-      analytics.track('reply_copied_only', { 
+
+      analytics.track('reply_copied_only', {
         replyLength: reply.length,
-        composerOpened: false 
+        composerOpened: false
       });
     }
   } catch (error) {
     console.error('Failed to copy to clipboard:', error);
-    
+
     // Fallback: show the reply in a modal for manual copy
     showReplyModal(reply);
-    
-    analytics.track('reply_copy_failed', { 
+
+    analytics.track('reply_copy_failed', {
       error: error.message,
-      fallbackUsed: true 
+      fallbackUsed: true
     });
   }
 }
@@ -866,31 +858,31 @@ async function insertReplyDirectly(tweet, reply) {
 async function insertQuoteDirectly(tweet, quote) {
   const autoPaste = settings.get('autoPaste');
   const openComposer = settings.get('openComposer');
-  
+
   try {
     // Always copy to clipboard first
     await navigator.clipboard.writeText(quote);
-    
+
     // Open quote retweet composer if enabled
     if (openComposer) {
       // Try to find quote retweet button (usually near reply button)
-      const quoteBtn = tweet.querySelector('[data-testid="retweet"]') || 
-                       tweet.querySelector('[aria-label*="Repost"]') ||
-                       tweet.querySelector('button[aria-label*="retweet"]');
-      
+      const quoteBtn = tweet.querySelector('[data-testid="retweet"]') ||
+        tweet.querySelector('[aria-label*="Repost"]') ||
+        tweet.querySelector('button[aria-label*="retweet"]');
+
       if (quoteBtn) {
         quoteBtn.click();
-        
+
         // Wait a bit for the modal to open, then click "Quote" option
         setTimeout(() => {
           const quoteOption = document.querySelector('[data-testid="Dropdown"] [role="menuitem"]') ||
-                              Array.from(document.querySelectorAll('div[role="menuitem"]')).find(el => 
-                                el.textContent.includes('Quote') || el.textContent.includes('Quote post')
-                              );
-          
+            Array.from(document.querySelectorAll('div[role="menuitem"]')).find(el =>
+              el.textContent.includes('Quote') || el.textContent.includes('Quote post')
+            );
+
           if (quoteOption) {
             quoteOption.click();
-            
+
             // Auto-paste if enabled
             if (autoPaste) {
               setTimeout(() => {
@@ -898,29 +890,29 @@ async function insertQuoteDirectly(tweet, quote) {
                 if (input) {
                   input.focus();
                   input.innerText = quote;
-                  
+
                   // Trigger input event for Twitter's character counter
                   const event = new Event('input', { bubbles: true });
                   input.dispatchEvent(event);
                 }
               }, 600);
-              
+
               if (settings.get('notifications')) {
                 showNotification("Quote retweet pasted automatically!", "success");
               }
-              
-              analytics.track('quote_auto_pasted', { 
+
+              analytics.track('quote_auto_pasted', {
                 quoteLength: quote.length,
-                autoPaste: true 
+                autoPaste: true
               });
             } else {
               if (settings.get('notifications')) {
                 showNotification("Quote retweet copied to clipboard! Paste it manually.", "success");
               }
-              
-              analytics.track('quote_copied', { 
+
+              analytics.track('quote_copied', {
                 quoteLength: quote.length,
-                autoPaste: false 
+                autoPaste: false
               });
             }
           } else {
@@ -941,21 +933,21 @@ async function insertQuoteDirectly(tweet, quote) {
       if (settings.get('notifications')) {
         showNotification("Quote retweet copied to clipboard!", "success");
       }
-      
-      analytics.track('quote_copied_only', { 
+
+      analytics.track('quote_copied_only', {
         quoteLength: quote.length,
-        composerOpened: false 
+        composerOpened: false
       });
     }
   } catch (error) {
     console.error('Failed to copy quote to clipboard:', error);
-    
+
     // Fallback: show the quote in a modal for manual copy
     showReplyModal(quote);
-    
-    analytics.track('quote_copy_failed', { 
+
+    analytics.track('quote_copy_failed', {
       error: error.message,
-      fallbackUsed: true 
+      fallbackUsed: true
     });
   }
 }
@@ -998,7 +990,7 @@ function showReplyModal(reply) {
 
   // Event listeners
   modal.querySelector('.close-modal').onclick = () => modal.remove();
-  
+
   modal.querySelector('.copy-manual').onclick = async () => {
     try {
       await navigator.clipboard.writeText(reply);
@@ -1010,7 +1002,7 @@ function showReplyModal(reply) {
   };
 
   document.body.appendChild(modal);
-  
+
   // Close on escape
   const handleEscape = (e) => {
     if (e.key === 'Escape') {
@@ -1133,7 +1125,7 @@ function showSimpleLoginModal() {
   modal.querySelector('#simpleLogin').onclick = async () => {
     const email = modal.querySelector('#simpleEmail').value.trim();
     const password = modal.querySelector('#simplePassword').value.trim();
-    
+
     if (!email || !password) {
       alert('Please enter both email and password');
       return;
@@ -1146,28 +1138,28 @@ function showSimpleLoginModal() {
 
     try {
       console.log('[Gemini] Attempting login for:', email);
-      const response = await fetch('https://autoreply-gt64.onrender.com/auth/login', {
+      const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-      
+
       console.log('[Gemini] Login response status:', response.status);
-      
+
       if (response.ok) {
         const data = await response.json();
         console.log('[Gemini] Login response data:', data);
-        
+
         if (data.user) {
           // Store user data
           await chrome.storage.local.set({ geminiUser: data.user });
           console.log('[Gemini] User data stored:', data.user);
           modal.remove();
           showNotification('Login successful! Welcome to Gemini Auto Reply!', 'success');
-          
+
           // Notify content scripts about login
           chrome.runtime.sendMessage({ type: 'USER_LOGGED_IN', user: data.user });
-          
+
           // Retry the original action
           if (originalAction) {
             originalAction();
@@ -1193,12 +1185,12 @@ function showSimpleLoginModal() {
       loginBtn.disabled = false;
     }
   };
-  
+
   // Register handler
   modal.querySelector('#simpleRegister').onclick = async () => {
     const email = modal.querySelector('#simpleEmail').value.trim();
     const password = modal.querySelector('#simplePassword').value.trim();
-    
+
     if (!email || !password) {
       alert('Please enter both email and password');
       return;
@@ -1216,28 +1208,28 @@ function showSimpleLoginModal() {
 
     try {
       console.log('[Gemini] Attempting registration for:', email);
-      const response = await fetch('https://autoreply-gt64.onrender.com/auth/register', {
+      const response = await fetch(`${CONFIG.API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-      
+
       console.log('[Gemini] Register response status:', response.status);
-      
+
       if (response.ok) {
         const data = await response.json();
         console.log('[Gemini] Register response data:', data);
-        
+
         if (data.user) {
           // Store user data
           await chrome.storage.local.set({ geminiUser: data.user });
           console.log('[Gemini] User data stored:', data.user);
           modal.remove();
           showNotification('Registration successful! Welcome to Gemini Auto Reply!', 'success');
-          
+
           // Notify content scripts about login
           chrome.runtime.sendMessage({ type: 'USER_LOGGED_IN', user: data.user });
-          
+
           // Retry the original action
           if (originalAction) {
             originalAction();
@@ -1249,17 +1241,17 @@ function showSimpleLoginModal() {
       } else {
         const errorData = await response.json();
         console.log('[Gemini] Register response data:', errorData);
-        
+
         if (errorData.user) {
           // User exists, login instead
           await chrome.storage.local.set({ geminiUser: errorData.user });
           console.log('[Gemini] User already exists, logged in:', errorData.user);
           modal.remove();
           showNotification('User already exists! Logged in successfully.', 'success');
-          
+
           // Notify content scripts about login
           chrome.runtime.sendMessage({ type: 'USER_LOGGED_IN', user: errorData.user });
-          
+
           // Retry the original action
           if (originalAction) {
             originalAction();
@@ -1281,14 +1273,14 @@ function showSimpleLoginModal() {
       registerBtn.disabled = false;
     }
   };
-  
+
   // Close on outside click
   modal.onclick = (e) => {
     if (e.target === modal) modal.remove();
   };
 
   document.body.appendChild(modal);
-  
+
   // Focus email input
   setTimeout(() => {
     modal.querySelector('#simpleEmail').focus();
@@ -1312,10 +1304,10 @@ function showNotification(message, type = 'info') {
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     animation: slideIn 0.3s ease-out;
   `;
-  
+
   notification.textContent = message;
   document.body.appendChild(notification);
-  
+
   setTimeout(() => {
     notification.style.animation = 'slideOut 0.3s ease-in';
     setTimeout(() => notification.remove(), 300);
@@ -1434,7 +1426,7 @@ function createOptionsPortal(items, onSelect) {
   // Add room descriptions and icons from project.json
   items.forEach((id) => {
     const info = getRoomInfo(id);
-    
+
     const row = document.createElement("div");
     row.className = "gemini-dropdown-item";
     row.style.cssText = `
@@ -1449,7 +1441,7 @@ function createOptionsPortal(items, onSelect) {
       gap: 10px;
       border-bottom: 1px solid ${CONFIG.THEME.border};
     `;
-    
+
     row.innerHTML = `
       <span style="font-size: 16px;">${info.icon}</span>
       <div style="display: flex; flex-direction: column;">
@@ -1457,22 +1449,22 @@ function createOptionsPortal(items, onSelect) {
         <span style="font-size: 11px; opacity: 0.7;">${info.desc}</span>
       </div>
     `;
-    
+
     row.addEventListener("mouseenter", () => {
       row.style.background = CONFIG.THEME.accent;
       row.style.transform = "translateX(4px)";
     });
-    
+
     row.addEventListener("mouseleave", () => {
       row.style.background = "transparent";
       row.style.transform = "translateX(0)";
     });
-    
+
     row.addEventListener("click", () => {
       analytics.track('room_selected', { roomId: id });
       onSelect(id);
     });
-    
+
     menu.appendChild(row);
   });
 
@@ -1618,10 +1610,10 @@ function createGlobalRoomSelector() {
     `;
     settings.set('selectedRoom', chosen);
     hideMenu();
-    
+
     // Update all existing tweet interfaces
     updateAllTweetInterfaces();
-    
+
     if (settings.get('notifications')) {
       showNotification(`Room changed to ${room.name}`, "success");
     }
@@ -1632,7 +1624,7 @@ function createGlobalRoomSelector() {
     selector.style.transform = 'translateY(-2px)';
     selector.style.boxShadow = '0 12px 30px rgba(0,0,0,0.4)';
   });
-  
+
   selector.addEventListener('mouseleave', () => {
     selector.style.transform = 'translateY(0)';
     selector.style.boxShadow = '0 8px 25px rgba(0,0,0,0.3)';
@@ -1650,7 +1642,7 @@ function createGlobalRoomSelector() {
     placeMenu();
     menu.style.display = "block";
   }
-  
+
   function hideMenu() {
     menu.style.display = "none";
   }
@@ -1658,7 +1650,7 @@ function createGlobalRoomSelector() {
   // Click to show dropdown
   selector.addEventListener('click', (e) => {
     if (e.target.classList.contains('gemini-room-dropdown-trigger')) {
-    showMenu();
+      showMenu();
     } else if (e.target.classList.contains('gemini-settings-btn')) {
       console.log('⚙️ Twitter Settings button clicked from room selector');
       showSettingsPanel();
@@ -1686,7 +1678,7 @@ function createGlobalRoomSelector() {
   globalRoomSelector = selector;
 
   analytics.track('global_room_selector_created', { selectedRoom });
-  
+
   return selector;
 }
 
@@ -1696,7 +1688,7 @@ function updateAllTweetInterfaces() {
   wrappers.forEach(wrapper => {
     const currentRoomId = settings.get('selectedRoom') || getAvailableRooms()[0];
     const room = getRoomInfo(currentRoomId);
-    
+
     // Update any room display in the wrapper if exists
     const roomDisplay = wrapper.querySelector('.current-room-display');
     if (roomDisplay) {
@@ -1740,7 +1732,7 @@ function addReplyButtonToTweet(tweet) {
 
   // Room info from project.json
   const currentRoom = getRoomInfo(selectedRoom);
-  
+
   const roomDisplay = document.createElement("div");
   roomDisplay.className = "current-room-display";
   roomDisplay.style.cssText = `
@@ -1795,7 +1787,7 @@ function addReplyButtonToTweet(tweet) {
     genBtn.style.transform = 'translateY(-1px)';
     genBtn.style.boxShadow = '0 4px 16px rgba(29, 155, 240, 0.4)';
   });
-  
+
   genBtn.addEventListener('mouseleave', () => {
     genBtn.style.transform = 'translateY(0)';
     genBtn.style.boxShadow = '0 2px 8px rgba(29, 155, 240, 0.3)';
@@ -1805,9 +1797,9 @@ function addReplyButtonToTweet(tweet) {
     e.preventDefault();
     e.stopPropagation();
     console.log("[Gemini] Generate Reply button clicked!");
-    
+
     // No authentication required
-    
+
     const roomId = settings.get('selectedRoom') || getAvailableRooms()[0];
     if (!roomId) {
       showNotification("Please select a room first!", "warning");
@@ -1845,7 +1837,7 @@ function addReplyButtonToTweet(tweet) {
     quoteBtn.style.transform = 'translateY(-1px)';
     quoteBtn.style.boxShadow = '0 4px 16px rgba(0, 186, 124, 0.4)';
   });
-  
+
   quoteBtn.addEventListener('mouseleave', () => {
     quoteBtn.style.transform = 'translateY(0)';
     quoteBtn.style.boxShadow = '0 2px 8px rgba(0, 186, 124, 0.3)';
@@ -1855,7 +1847,7 @@ function addReplyButtonToTweet(tweet) {
     e.preventDefault();
     e.stopPropagation();
     console.log("[Gemini] Generate Quote Retweet button clicked!");
-    
+
     const roomId = settings.get('selectedRoom') || getAvailableRooms()[0];
     if (!roomId) {
       showNotification("Please select a room first!", "warning");
@@ -1888,7 +1880,7 @@ function addReplyButtonToTweet(tweet) {
     e.preventDefault();
     e.stopPropagation();
     console.log("[Gemini] Quick button clicked!");
-    
+
     const roomId = settings.get('selectedRoom') || getAvailableRooms()[0];
     if (!roomId) {
       showNotification("Please select a room first!", "warning");
@@ -1946,12 +1938,12 @@ function addReplyButtonToTweet(tweet) {
       }
 
       const translated = data.text.trim();
-      
+
       // Try to paste directly to input field
-      const inputField = document.querySelector('div[data-testid="tweetTextarea_0"]') || 
-                        document.querySelector('div[role="textbox"][data-testid="tweetTextarea_0"]') ||
-                        document.querySelector('div[role="textbox"]');
-      
+      const inputField = document.querySelector('div[data-testid="tweetTextarea_0"]') ||
+        document.querySelector('div[role="textbox"][data-testid="tweetTextarea_0"]') ||
+        document.querySelector('div[role="textbox"]');
+
       if (inputField) {
         inputField.focus();
         inputField.innerText = translated;
@@ -2022,12 +2014,12 @@ function addReplyButtonToTweet(tweet) {
       }
 
       const polished = data.text.trim();
-      
+
       // Try to paste directly to input field
-      const inputField = document.querySelector('div[data-testid="tweetTextarea_0"]') || 
-                        document.querySelector('div[role="textbox"][data-testid="tweetTextarea_0"]') ||
-                        document.querySelector('div[role="textbox"]');
-      
+      const inputField = document.querySelector('div[data-testid="tweetTextarea_0"]') ||
+        document.querySelector('div[role="textbox"][data-testid="tweetTextarea_0"]') ||
+        document.querySelector('div[role="textbox"]');
+
       if (inputField) {
         inputField.focus();
         inputField.innerText = polished;
@@ -2085,14 +2077,14 @@ function addReplyButtonToTweet(tweet) {
       console.error('❌ Error calling showSettingsPanel:', error);
     }
   });
-  
+
   // Add mousedown event as backup
   settingsBtn.addEventListener('mousedown', (e) => {
     console.log('🔍 Twitter Settings button mousedown event');
     e.preventDefault();
     e.stopPropagation();
   });
-  
+
   // Add mouseup event as backup
   settingsBtn.addEventListener('mouseup', (e) => {
     console.log('🔍 Twitter Settings button mouseup event');
@@ -2162,25 +2154,25 @@ function addReplyButtonToTweet(tweet) {
   });
   cleanupObserver.observe(document.body, { childList: true, subtree: true });
 
-  analytics.track('tweet_interface_added', { 
+  analytics.track('tweet_interface_added', {
     selectedRoom: selectedRoom,
     hasGlobalSelector: !!globalRoomSelector
   });
-  
+
   console.log(`[Gemini Extension] Tweet interface added for room: ${selectedRoom}`);
 }
 
 // === Settings Panel
 function showSettingsPanel() {
   console.log('🔧 Twitter showSettingsPanel called');
-  
+
   // Remove existing settings panel
   const existingPanel = document.querySelector('.gemini-settings-panel');
   if (existingPanel) {
     console.log('🗑️ Removing existing Twitter settings panel');
     existingPanel.remove();
   }
-  
+
   console.log('🆕 Creating new Twitter settings panel');
 
   const panel = document.createElement('div');
@@ -2204,7 +2196,7 @@ function showSettingsPanel() {
   `;
 
   const stats = analytics.getStats();
-  
+
   panel.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h2 style="margin: 0; color: ${CONFIG.THEME.text}; font-size: 20px;">⚙️ Extension Settings</h2>
@@ -2310,11 +2302,11 @@ function showSettingsPanel() {
 
   // Event listeners
   panel.querySelector('.close-settings').onclick = () => panel.remove();
-  
+
   panel.querySelector('#maxReplies').oninput = (e) => {
     panel.querySelector('#maxRepliesValue').textContent = e.target.value;
   };
-  
+
   panel.querySelector('.save-settings').onclick = () => {
     settings.set('showPreview', panel.querySelector('#showPreview').checked);
     settings.set('notifications', panel.querySelector('#notifications').checked);
@@ -2322,11 +2314,11 @@ function showSettingsPanel() {
     settings.set('autoPaste', panel.querySelector('#autoPaste').checked);
     settings.set('openComposer', panel.querySelector('#openComposer').checked);
     settings.set('maxReplies', parseInt(panel.querySelector('#maxReplies').value));
-    
+
     showNotification("Settings saved successfully!", "success");
     panel.remove();
   };
-  
+
   panel.querySelector('.reset-settings').onclick = () => {
     if (confirm('Are you sure you want to reset all settings?')) {
       settings.settings = settings.getDefaultSettings();
@@ -2335,7 +2327,7 @@ function showSettingsPanel() {
       panel.remove();
     }
   };
-  
+
   panel.querySelector('#exportData').onclick = () => {
     const data = {
       settings: settings.settings,
@@ -2343,7 +2335,7 @@ function showSettingsPanel() {
       stats: stats,
       exportDate: new Date().toISOString()
     };
-    
+
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -2351,10 +2343,10 @@ function showSettingsPanel() {
     a.download = `gemini-extension-data-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    
+
     showNotification("Analytics data exported!", "success");
   };
-  
+
   // Authentication buttons
   panel.querySelector('#loginBtn').onclick = () => {
     panel.remove();
@@ -2365,7 +2357,7 @@ function showSettingsPanel() {
       showSimpleLoginModal();
     }
   };
-  
+
   panel.querySelector('#userInfoBtn').onclick = () => {
     panel.remove();
     if (window.geminiAuthUI) {
@@ -2377,7 +2369,7 @@ function showSettingsPanel() {
 
   document.body.appendChild(panel);
   console.log('✅ Twitter Settings panel appended to body');
-  
+
   // Close on escape
   const handleEscape = (e) => {
     if (e.key === 'Escape') {
@@ -2391,14 +2383,14 @@ function showSettingsPanel() {
 // === Analytics Panel for Twitter
 function showAnalyticsPanel() {
   console.log('📊 Twitter showAnalyticsPanel called');
-  
+
   // Remove existing panel if any
   const existingPanel = document.querySelector('.gemini-analytics-panel');
   if (existingPanel) {
     console.log('🗑️ Removing existing Twitter analytics panel');
     existingPanel.remove();
   }
-  
+
   console.log('🆕 Creating new Twitter analytics panel');
 
   const panel = document.createElement('div');
@@ -2422,7 +2414,7 @@ function showAnalyticsPanel() {
   `;
 
   const stats = analytics.getStats();
-  
+
   panel.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h2 style="margin: 0; color: ${CONFIG.THEME.text}; font-size: 20px;">📊 Analytics</h2>
@@ -2489,7 +2481,7 @@ function showAnalyticsPanel() {
 
   // Event listeners
   panel.querySelector('.close-analytics').onclick = () => panel.remove();
-  
+
   panel.querySelector('.export-analytics').onclick = () => {
     const data = {
       settings: settings.settings,
@@ -2497,7 +2489,7 @@ function showAnalyticsPanel() {
       stats: stats,
       exportDate: new Date().toISOString()
     };
-    
+
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -2505,13 +2497,13 @@ function showAnalyticsPanel() {
     a.download = `gemini-twitter-analytics-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    
+
     showNotification("Analytics data exported!", "success");
   };
 
   document.body.appendChild(panel);
   console.log('✅ Twitter Analytics panel appended to body');
-  
+
   // Close on escape
   const handleEscape = (e) => {
     if (e.key === 'Escape') {
@@ -2548,13 +2540,13 @@ async function initializeExtension() {
     createGlobalRoomSelector();
 
     // Add interface to existing tweets
-  document.querySelectorAll("article").forEach((tweet) => {
-    addReplyButtonToTweet(tweet);
-  });
+    document.querySelectorAll("article").forEach((tweet) => {
+      addReplyButtonToTweet(tweet);
+    });
 
     // Start monitoring for new tweets
-    observer.observe(document.body, { 
-      childList: true, 
+    observer.observe(document.body, {
+      childList: true,
       subtree: true,
       attributes: false
     });
@@ -2563,14 +2555,14 @@ async function initializeExtension() {
     document.addEventListener('keydown', (e) => {
       // Ctrl/Cmd + Shift + G for quick generate on focused tweet
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'G') {
-        const focusedTweet = document.querySelector('article:focus-within') || 
-                           document.querySelector('article:hover');
+        const focusedTweet = document.querySelector('article:focus-within') ||
+          document.querySelector('article:hover');
         if (focusedTweet) {
           const btn = focusedTweet.querySelector('.gemini-room-btn');
           if (btn) btn.click();
         }
       }
-      
+
       // Ctrl/Cmd + Shift + S for settings
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'S') {
         showSettingsPanel();
@@ -2581,7 +2573,7 @@ async function initializeExtension() {
     console.log(`[Gemini Extension] 📊 Analytics: ${settings.get('analytics') ? 'Enabled' : 'Disabled'}`);
     console.log(`[Gemini Extension] 🎨 Theme: ${settings.get('theme')}`);
     console.log(`[Gemini Extension] ⌨️  Shortcuts: Ctrl+Shift+G (Generate), Ctrl+Shift+S (Settings)`);
-    
+
     // Show welcome notification
     if (settings.get('notifications')) {
       setTimeout(() => {
