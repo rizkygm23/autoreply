@@ -6,23 +6,6 @@ Advanced AI-powered Chrome extension for generating contextual replies on Twitte
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Chrome-yellow)
 
-## 📋 Table of Contents
-
-- [Features](#-features)
-- [Prerequisites](#-prerequisites)
-- [Installation](#-installation)
-  - [Server Setup](#1-server-setup)
-  - [Extension Setup](#2-extension-setup)
-- [Configuration](#%EF%B8%8F-configuration)
-- [Usage](#-usage)
-- [API Endpoints](#-api-endpoints)
-- [Room Personalities](#-room-personalities)
-- [Troubleshooting](#-troubleshooting)
-- [Contributing](#-contributing)
-- [License](#-license)
-
----
-
 ## ✨ Features
 
 ### 🤖 AI-Powered Replies
@@ -49,8 +32,6 @@ Advanced AI-powered Chrome extension for generating contextual replies on Twitte
 ---
 
 ## 📦 Prerequisites
-
-Before you begin, ensure you have the following installed:
 
 | Requirement | Version | Download |
 |-------------|---------|----------|
@@ -93,29 +74,11 @@ cp env.example .env
 
 Edit `.env` file with your configuration:
 ```env
-# =============================================
-# Required Configuration
-# =============================================
-
 # xAI API Key (Get from https://x.ai)
 XAI_API_KEY=your_xai_api_key_here
 
 # Server Port
 PORT=3000
-
-# =============================================
-# Optional: Token System Configuration
-# =============================================
-
-# Free tokens for new users
-FREE_TOKENS=200000
-
-# Cost per action (in tokens)
-TOKEN_COST_GENERATE=100
-TOKEN_COST_QUICK=50
-TOKEN_COST_TOPIC=25
-TOKEN_COST_TRANSLATE=10
-TOKEN_COST_PARAPHRASE=10
 ```
 
 #### Step 5: Start the Server
@@ -152,33 +115,6 @@ You should see:
 #### Step 3: Verify Installation
 - You should see "Gemini Social Assistant Enhanced" in your extensions list
 - The extension icon should appear in your Chrome toolbar
-
-#### Step 4: Configure Extension (Optional)
-1. Click the extension icon in the toolbar
-2. Configure your preferred settings
-3. Select your default room/community
-
----
-
-## ⚙️ Configuration
-
-### Server Configuration
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `XAI_API_KEY` | Your xAI API key | Required |
-| `PORT` | Server port | `3000` |
-| `NODE_ENV` | Environment mode | `development` |
-
-### Extension Settings
-
-Access settings via the ⚙️ button or `Ctrl+Shift+S`:
-
-| Setting | Description |
-|---------|-------------|
-| Show Reply Preview | Enable/disable preview modal |
-| Enable Notifications | Show success/error notifications |
-| Max Replies to Analyze | Context collection depth (5-50) |
 
 ---
 
@@ -217,17 +153,6 @@ Access settings via the ⚙️ button or `Ctrl+Shift+S`:
 | `/generate-translate` | POST | Indonesian → English translation |
 | `/generate-parafrase` | POST | Improve/paraphrase English text |
 
-### Request Example
-```bash
-curl -X POST http://localhost:3000/generate-discord \
-  -H "Content-Type: application/json" \
-  -d '{
-    "caption": "Hello everyone!",
-    "roomId": "cys",
-    "username": "user123"
-  }'
-```
-
 ---
 
 ## 🏠 Room Personalities
@@ -263,8 +188,6 @@ The server logs token usage and estimated costs for each request:
 ---
 
 ## 🐛 Troubleshooting
-
-### Common Issues
 
 | Issue | Solution |
 |-------|----------|
@@ -308,24 +231,14 @@ auto-reply/
     │   └── 📁 generate/      # Generation endpoints
     ├── 📁 services/          # AI service layer
     ├── 📁 lib/               # Helper utilities
-    └── 📁 data/              # Room data storage
+    └── 📁 data/              # Room data & local storage
 ```
-
----
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
 ---
 

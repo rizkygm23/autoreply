@@ -1,7 +1,11 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "main": "index.js",
+  "type": "module",
+  "main": "api/index.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "bun --watch index.js",
     "start": "bun index.js"
