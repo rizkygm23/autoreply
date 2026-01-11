@@ -3,6 +3,10 @@ import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
 
+// Load environment variables first
+dotenv.config();
+
+// Import after dotenv is configured
 import { randId, logInfo, logOk, COLORS } from "../lib/logger.js";
 import { openai } from "../services/aiService.js";
 import { registerAuthRegisterRoute } from "../routes/auth/register.js";
@@ -18,13 +22,18 @@ import { registerParaphraseRoute } from "../routes/generate/paraphrase.js";
 import { registerQuickReplyRoute } from "../routes/generate/quickReply.js";
 import { registerTranslateRoute } from "../routes/generate/translate.js";
 
-dotenv.config();
-
 const app = express();
 
-app.use(cors());
+// CORS configuration
+app.use(cors({
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
 app.use(bodyParser.json());
 
+// Request logging middleware
 app.use((req, _res, next) => {
     req._id = `REQ-${randId()}`;
     req._t0 = Date.now();
@@ -37,10 +46,12 @@ app.get("/", (req, res) => {
     res.json({
         status: "ok",
         message: "Gemini Auto Reply API",
-        version: "2.0.0"
+        version: "2.0.0",
+        environment: process.env.VERCEL_ENV || "local"
     });
 });
 
+// Register all routes
 registerAuthRegisterRoute(app);
 registerAuthLoginRoute(app);
 registerAuthGetUserRoute(app);
@@ -54,8 +65,17 @@ registerParaphraseRoute(app);
 registerQuickReplyRoute(app);
 registerTranslateRoute(app);
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error("Unhandled error:", err);
+    res.status(500).json({
+        error: "Internal server error",
+        message: err.message
+    });
+});
+
 logOk(`Vercel Serverless Function initialized`);
-logInfo(`xAI base URL: ${COLORS.gray}${openai.baseURL || "https://api.x.ai/v1"}${COLORS.reset}`);
+logInfo(`xAI base URL: ${COLORS.gray}${openai?.baseURL || "https://api.x.ai/v1"}${COLORS.reset}`);
 
 // Export for Vercel Serverless
 export default app;
