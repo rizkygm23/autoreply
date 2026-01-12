@@ -26,6 +26,56 @@ function estimateRequestTokens(prompt, roomData, userRoom) {
 
 
 
+/**
+ * Extracts a simple nickname from a Discord username
+ * Examples:
+ * - "Arya | Bharat Maxi" → "Arya"
+ * - "John_Smith123" → "John"
+ * - "CryptoKing | ETH Maxi | 🚀" → "CryptoKing"
+ * - "xX_DarkLord_Xx" → "DarkLord"
+ * @param {string} username - Full username from Discord
+ * @returns {string} - Simple nickname
+ */
+function extractNickname(username) {
+  if (!username) return "";
+
+  // Common separators in Discord usernames
+  const separators = /[|·\-_.\s]+/;
+
+  // Split by separators and get the first meaningful part
+  const parts = username.split(separators).filter(part => part.trim().length > 0);
+
+  if (parts.length === 0) return "";
+
+  // Get the first part
+  let nickname = parts[0].trim();
+
+  // Remove common prefixes/suffixes like xX_ or _Xx, numbers at the end
+  nickname = nickname
+    .replace(/^[xX]{1,2}[_]*/, "") // Remove xX_ prefix
+    .replace(/[_]*[xX]{1,2}$/, "") // Remove _Xx suffix
+    .replace(/\d+$/, "") // Remove trailing numbers
+    .replace(/[^\w\s]/g, "") // Remove special characters except letters and spaces
+    .trim();
+
+  // If still empty, try to use parts[1] or return cleaned original
+  if (!nickname && parts.length > 1) {
+    nickname = parts[1].trim().replace(/[^\w\s]/g, "").replace(/\d+$/, "").trim();
+  }
+
+  // If still nothing, return original username cleaned
+  if (!nickname) {
+    nickname = username.replace(/[^\w\s]/g, "").replace(/\d+$/, "").trim().split(/\s+/)[0] || "";
+  }
+
+  // Capitalize first letter
+  if (nickname.length > 0) {
+    nickname = nickname.charAt(0).toUpperCase() + nickname.slice(1).toLowerCase();
+  }
+
+  return nickname;
+}
+
 function removeContractions(text) {
   if (!text) return text;
 
@@ -74,6 +124,7 @@ export {
   estimateTokens,
   estimateRequestTokens,
   removeContractions,
+  extractNickname,
 };
 
 

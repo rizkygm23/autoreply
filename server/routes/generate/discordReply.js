@@ -1,6 +1,6 @@
 import path from "path";
 import { startSpinner, logInfo, logOk, logErr, logWarn, COLORS } from "../../lib/logger.js";
-import { sanitizeText, removeContractions } from "../../lib/helpers.js";
+import { sanitizeText, removeContractions, extractNickname } from "../../lib/helpers.js";
 import { DATA_DIR, saveEntryToJSON, loadJSON } from "../../lib/storage.js";
 import { generateReplyFromGrok } from "../../services/aiService.js";
 
@@ -31,6 +31,11 @@ function registerDiscordReplyRoute(app) {
       logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing caption/roomId on /generate-discord`);
       return res.status(400).json({ error: "caption and roomId are required" });
     }
+
+    // Extract nickname from username for more natural replies
+    // e.g., "Arya | Bharat Maxi" -> "Arya"
+    const nickname = extractNickname(username);
+    logInfo(`${COLORS.cyan}${req._id}${COLORS.reset} 🏷️ Username: ${username || 'N/A'} -> Nickname: ${nickname || 'N/A'}`);
 
     let tambahan = "";
     let kodeEmoji = [];
@@ -245,26 +250,28 @@ You are a friendly Discord user active in the "${roomId}" community.
 Current Mode: reply
 
 Task:
-Write ONE short authentic reply to the new message from ${username ? username : "a user"}.
+Write ONE short authentic reply to the new message from ${nickname ? nickname : username ? username : "a user"}.
 Maximum 12 words, single sentence only.
 Detect the language of the new message automatically and reply in the same language.
 If they ask to support the content, at the end say "back me on notify"
 
 Context:
 Recent replies: ${historyText || "(no history yet)"}
-New message from ${username || 'User'}: "${caption}"
+New message from ${nickname || username || 'User'}: "${caption}"
 
 Specific Rules:
 - Emojis allowed only if they feel natural and match this set: ${JSON.stringify(kodeEmoji)}.
 - Do not copy the message or conversation history.
-- USERNAME USAGE RULE (IMPORTANT):
-  * Only use the username in these specific contexts:
-    1. GREETINGS: "gm ${username ? username : ''}", "morning ${username ? username : ''}", "yo ${username ? username : ''}"
-    2. FAREWELLS: "catch you later ${username ? username : ''}", "see ya ${username ? username : ''}", "later ${username ? username : ''}"
-    3. ADDRESSING/SAPAAN: "hey ${username ? username : ''}", "thanks ${username ? username : ''}", "nice one ${username ? username : ''}", "true ${username ? username : ''}"
-  * DO NOT use the username in the MIDDLE of sentences (e.g. NEVER say "${username ? username : ''} makes a good point" or "I agree with ${username ? username : ''}")
-  * Username should only appear at the START or END of a short reply, not in analytical/conversational statements
-  * This keeps conversations natural and avoids sounding cringe
+- NICKNAME USAGE RULE (IMPORTANT):
+  * Use ONLY the simple nickname "${nickname || ''}" for addressing, NOT the full username.
+  * Only use the nickname in these specific contexts:
+    1. GREETINGS: "gm ${nickname || ''}", "morning ${nickname || ''}", "yo ${nickname || ''}"
+    2. FAREWELLS: "catch you later ${nickname || ''}", "see ya ${nickname || ''}", "later ${nickname || ''}"
+    3. ADDRESSING/SAPAAN: "hey ${nickname || ''}", "thanks ${nickname || ''}", "nice one ${nickname || ''}", "true ${nickname || ''}"
+  * DO NOT use the full username "${username || ''}", use the nickname "${nickname || ''}" instead.
+  * DO NOT use the nickname in the MIDDLE of sentences (e.g. NEVER say "${nickname || ''} makes a good point" or "I agree with ${nickname || ''}")
+  * Nickname should only appear at the START or END of a short reply, not in analytical/conversational statements
+  * This keeps conversations natural and avoids sounding cringe or copy-paste
 `;
 
     const spinner = startSpinner(`${req._id} /generate-discord`, "AI thinking");
