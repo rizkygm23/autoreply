@@ -80,6 +80,7 @@ function removeContractions(text) {
   if (!text) return text;
 
   const contractions = {
+    // 's contractions (is/has)
     "what's": "what is",
     "how's": "how is",
     "when's": "when is",
@@ -89,13 +90,65 @@ function removeContractions(text) {
     "that's": "that is",
     "here's": "here is",
     "there's": "there is",
-    "I'm": "I am",
-    "you're": "you are",
-    "we're": "we are",
-    "they're": "they are",
     "he's": "he is",
     "she's": "she is",
     "let's": "let us",
+    "one's": "one is",
+    "everyone's": "everyone is",
+    "someone's": "someone is",
+    "anyone's": "anyone is",
+    "nobody's": "nobody is",
+    "everything's": "everything is",
+    "something's": "something is",
+    "nothing's": "nothing is",
+    "today's": "today is",
+    "tomorrow's": "tomorrow is",
+    "yesterday's": "yesterday was",
+    "life's": "life is",
+    "love's": "love is",
+    "time's": "time is",
+    "man's": "man is",
+    "world's": "world is",
+
+    // 'm contractions
+    "I'm": "I am",
+    "i'm": "i am",
+
+    // 're contractions
+    "you're": "you are",
+    "we're": "we are",
+    "they're": "they are",
+
+    // 've contractions
+    "I've": "I have",
+    "i've": "i have",
+    "you've": "you have",
+    "we've": "we have",
+    "they've": "they have",
+
+    // 'll contractions
+    "I'll": "I will",
+    "i'll": "i will",
+    "you'll": "you will",
+    "we'll": "we will",
+    "they'll": "they will",
+    "he'll": "he will",
+    "she'll": "she will",
+    "it'll": "it will",
+    "that'll": "that will",
+
+    // 'd contractions
+    "I'd": "I would",
+    "i'd": "i would",
+    "you'd": "you would",
+    "we'd": "we would",
+    "they'd": "they would",
+    "he'd": "he would",
+    "she'd": "she would",
+    "it'd": "it would",
+    "that'd": "that would",
+
+    // n't contractions
     "can't": "cannot",
     "won't": "will not",
     "don't": "do not",
@@ -103,10 +156,17 @@ function removeContractions(text) {
     "didn't": "did not",
     "hasn't": "has not",
     "haven't": "have not",
+    "hadn't": "had not",
     "isn't": "is not",
     "aren't": "are not",
     "wasn't": "was not",
     "weren't": "were not",
+    "wouldn't": "would not",
+    "couldn't": "could not",
+    "shouldn't": "should not",
+    "mustn't": "must not",
+    "needn't": "need not",
+    "ain't": "is not",
   };
 
   let result = text;
@@ -115,6 +175,24 @@ function removeContractions(text) {
     const regex = new RegExp(`\\b${contraction.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi");
     result = result.replace(regex, fullForm);
   });
+
+  // Fallback: catch any remaining 's patterns and convert to "is"
+  // This handles cases like "name's" -> "name is", "thing's" -> "thing is"
+  result = result.replace(/(\w+)'s\b/gi, (match, word) => {
+    // Skip possessive cases that don't make sense as "is" 
+    // (we'll just remove the 's for those)
+    const lowerWord = word.toLowerCase();
+    // Common words that should use "is"
+    const useIs = ['it', 'that', 'this', 'what', 'who', 'how', 'where', 'when', 'why', 'there', 'here', 'he', 'she', 'everyone', 'someone', 'anyone', 'nobody', 'everybody', 'somebody', 'anybody', 'everything', 'something', 'nothing', 'one'];
+    if (useIs.includes(lowerWord)) {
+      return `${word} is`;
+    }
+    // For other words, just remove the 's (possessive -> no apostrophe)
+    return word;
+  });
+
+  // Also remove any remaining apostrophes that might be left
+  result = result.replace(/(\w+)'(\w+)/g, "$1$2");
 
   return result;
 }
