@@ -1,6 +1,6 @@
 import path from "path";
 import { startSpinner, logInfo, logOk, logErr, logWarn, COLORS } from "../../lib/logger.js";
-import { sanitizeText, removeContractions, extractNickname } from "../../lib/helpers.js";
+import { sanitizeText, removeContractions, extractNickname, getUserTimeContext } from "../../lib/helpers.js";
 import { DATA_DIR, saveEntryToJSON, loadJSON } from "../../lib/storage.js";
 import { generateReplyFromGrok } from "../../services/aiService.js";
 
@@ -36,6 +36,10 @@ function registerDiscordReplyRoute(app) {
     // e.g., "Arya | Bharat Maxi" -> "Arya"
     const nickname = extractNickname(username);
     logInfo(`${COLORS.cyan}${req._id}${COLORS.reset} 🏷️ Username: ${username || 'N/A'} -> Nickname: ${nickname || 'N/A'}`);
+
+    // Get time-based context for realistic responses
+    const timeContext = getUserTimeContext();
+    logInfo(`${COLORS.cyan}${req._id}${COLORS.reset} ⏰ Time Context: ${timeContext.hour}:00 WIB (${timeContext.period}) | Energy: ${timeContext.energy}`);
 
     let tambahan = "";
     let kodeEmoji = [];
@@ -245,6 +249,25 @@ function registerDiscordReplyRoute(app) {
     Return ONLY the final reply text.
   </output_format>
 </system_configuration>
+
+<time_based_personality>
+${timeContext.contextString}
+
+TIME-AWARE RESPONSE RULES:
+- If someone asks "how are you?", "what's up?", "busy?", "capek?", "ngapain?", "lagi apa?" etc:
+  * Your response MUST reflect your current time-based state naturally
+  * Example at 22:00 (night): "all good, in the zone rn" or "productive night so far"
+  * Example at 01:00 (late): "still up grinding" or "probably should sleep lol"
+  * Example at 14:00 weekday: "surviving afternoon classes" or "a bit sleepy ngl"
+  * Example at 10:00 weekend: "chill morning, working on some stuff"
+  
+- Energy level affects response enthusiasm:
+  * High energy = more engaged, enthusiastic replies
+  * Low energy = shorter, more tired, casual replies
+  * Medium = balanced, normal replies
+
+- DON'T explicitly say "it's 22:00" or "because it's night" - just let the mood/tone reflect it naturally
+</time_based_personality>
 
 You are a friendly Discord user active in the "${roomId}" community.
 Current Mode: reply

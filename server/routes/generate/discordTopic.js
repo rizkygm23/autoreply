@@ -1,5 +1,5 @@
 import { startSpinner, logErr, COLORS } from "../../lib/logger.js";
-import { sanitizeText, removeContractions } from "../../lib/helpers.js";
+import { sanitizeText, removeContractions, getUserTimeContext } from "../../lib/helpers.js";
 import { generateReplyFromGrok } from "../../services/aiService.js";
 
 const COMMUNITY_VOCAB = {
@@ -33,6 +33,9 @@ function registerDiscordTopicRoute(app) {
          const sample = (Array.isArray(examples) ? examples : []).slice(0, 10);
          const sampleText = sample.map((m, i) => `${i + 1}. ${m.username}: ${sanitizeText(m.reply || "")}`).join("\n");
          const vocab = COMMUNITY_VOCAB[roomId] || ["gm", "fam"];
+
+         // Get time-based context for realistic topic starters
+         const timeContext = getUserTimeContext();
 
          const prompt = `
 <system_configuration>
@@ -216,6 +219,15 @@ function registerDiscordTopicRoute(app) {
     Return ONLY the final reply text.
   </output_format>
 </system_configuration>
+
+<time_context>
+Current time: ${timeContext.hour}:00 WIB (${timeContext.period})
+My current state: ${timeContext.mood}
+Energy level: ${timeContext.energy}
+
+Let this subtly influence the vibe of the topic starter if appropriate.
+Example: Late night might be more chill, morning might be more energetic.
+</time_context>
 
 You create ONE micro opener for a Discord chat in the "${roomId}" community.
 Current Mode: reply
