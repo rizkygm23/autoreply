@@ -1,27 +1,41 @@
 import path from "path";
+import fs from "fs";
 import { startSpinner, logInfo, logOk, logErr, logWarn, COLORS } from "../../lib/logger.js";
 import { sanitizeText, removeContractions, extractNickname, getUserTimeContext } from "../../lib/helpers.js";
 import { DATA_DIR, saveEntryToJSON, loadJSON, getRecentResponsesText, isResponseDuplicate, saveResponseToMemory } from "../../lib/storage.js";
 import { generateReplyFromGrok } from "../../services/aiService.js";
 
-const cysEmoji = [
-  ":CysicSymbol_Coloronwhite2x:",
-  ":0009_pepeLove:",
-  ":pepe_pray:",
-  " :pogcat:",
-  ":pplove:",
-  ":cat_hehe:",
-  ":1831hilariousstickersgg:",
-  ":mad_fire_MAD_crazy:",
-  ":boredom_is_legitness:",
-  ":Lol:",
-  ":iyeey:",
-  ":elmo_fire:",
-  ":poggersanimated:",
-  ":burn:",
-  ":23:",
-  ":tea~1:",
-];
+// Load room configurations from project.json
+const PROJECT_CONFIG_PATH = path.join(process.cwd(), "..", "project.json");
+let projectConfig = null;
+
+function loadProjectConfig() {
+  try {
+    if (fs.existsSync(PROJECT_CONFIG_PATH)) {
+      const raw = fs.readFileSync(PROJECT_CONFIG_PATH, "utf-8");
+      projectConfig = JSON.parse(raw);
+      logInfo(`📦 Loaded project config with ${projectConfig.rooms?.length || 0} rooms`);
+    }
+  } catch (err) {
+    logWarn(`Failed to load project.json: ${err.message}`);
+  }
+}
+
+// Get room config by ID
+function getRoomConfig(roomId) {
+  if (!projectConfig) loadProjectConfig();
+
+  const room = projectConfig?.rooms?.find(r => r.id === roomId);
+  return {
+    emojis: room?.emojis || [],
+    vocab: room?.vocab || ["gm", "fam"],
+    extraInfo: room?.extraInfo || "",
+    name: room?.name || roomId
+  };
+}
+
+// Initial load
+loadProjectConfig();
 
 function registerDiscordReplyRoute(app) {
   app.post("/generate-discord", async (req, res) => {
@@ -41,13 +55,13 @@ function registerDiscordReplyRoute(app) {
     const timeContext = getUserTimeContext();
     logInfo(`${COLORS.cyan}${req._id}${COLORS.reset} ⏰ Time Context: ${timeContext.hour}:00 WIB (${timeContext.period}) | Energy: ${timeContext.energy}`);
 
-    let tambahan = "";
-    let kodeEmoji = [];
+    // Get room-specific config from project.json
+    const roomConfig = getRoomConfig(roomId);
+    const roomEmojis = roomConfig.emojis;
+    const roomVocab = roomConfig.vocab;
+    const roomExtraInfo = roomConfig.extraInfo;
 
-    if (roomId === "cys") {
-      kodeEmoji = cysEmoji;
-      tambahan = "gmsor adalah sapaan, kalau ada yang menanyakan tentang role suruh akses ke #🎯｜cysic-role";
-    }
+    logInfo(`${COLORS.cyan}${req._id}${COLORS.reset} 🎮 Room: ${roomConfig.name} | Emojis: ${roomEmojis.length} | Vocab: ${roomVocab.join(', ')}`);
 
     const jsonPath = path.join(DATA_DIR, `${roomId}.json`);
     logInfo(`${COLORS.cyan}${req._id}${COLORS.reset} 💬 Komentar (Discord): ${COLORS.gray}${komentar.length} items${COLORS.reset} | User: ${username || 'N/A'}`);
@@ -287,7 +301,15 @@ Recent replies: ${historyText || "(no history yet)"}
 New message from ${nickname || username || 'User'}: "${caption}"
 
 Specific Rules:
-- Emojis allowed only if they feel natural and match this set: ${JSON.stringify(kodeEmoji)}.
+${roomEmojis.length > 0 ? `- EMOJI USAGE (OPTIONAL - USE SPARINGLY):
+  * Available custom emojis for this server: ${JSON.stringify(roomEmojis)}
+  * Only use emoji if it GENUINELY fits the context and adds value
+  * DO NOT force emojis - most replies should be text-only
+  * Good contexts for emoji: excited reactions, celebrations, showing support, playful responses
+  * Bad contexts for emoji: serious discussions, technical questions, neutral statements
+  * Maximum 1 emoji per reply, placed at the end if used
+  * When in doubt, skip the emoji` : '- No custom emojis available for this server'}
+${roomExtraInfo ? `- ROOM-SPECIFIC INFO: ${roomExtraInfo}` : ''}
 - Do not copy the message or conversation history.
 - NICKNAME USAGE RULE (CRITICAL - READ CAREFULLY):
   * DEFAULT BEHAVIOR: DO NOT USE ANY NAME/NICKNAME IN YOUR REPLY. Most replies should NOT mention names at all.

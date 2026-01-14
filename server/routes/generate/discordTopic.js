@@ -1,14 +1,37 @@
-import { startSpinner, logErr, COLORS } from "../../lib/logger.js";
+import path from "path";
+import fs from "fs";
+import { startSpinner, logErr, logInfo, COLORS } from "../../lib/logger.js";
 import { sanitizeText, removeContractions, getUserTimeContext } from "../../lib/helpers.js";
 import { generateReplyFromGrok } from "../../services/aiService.js";
 
-const COMMUNITY_VOCAB = {
-   cys: ["Cysors", "gmsor", "fam", "gm", "wen", "zk"],
-   mmt: ["MMT", "fam", "gm"],
-   fgo: ["Fogo", "gm", "fam"],
-   rialo: ["Rialo", "gm", "fam"],
-   fastTest: ["gm", "fam"],
-};
+// Load room configurations from project.json
+const PROJECT_CONFIG_PATH = path.join(process.cwd(), "..", "project.json");
+let projectConfig = null;
+
+function loadProjectConfig() {
+   try {
+      if (fs.existsSync(PROJECT_CONFIG_PATH)) {
+         const raw = fs.readFileSync(PROJECT_CONFIG_PATH, "utf-8");
+         projectConfig = JSON.parse(raw);
+      }
+   } catch (err) {
+      console.warn(`Failed to load project.json: ${err.message}`);
+   }
+}
+
+// Get room config by ID
+function getRoomConfig(roomId) {
+   if (!projectConfig) loadProjectConfig();
+
+   const room = projectConfig?.rooms?.find(r => r.id === roomId);
+   return {
+      vocab: room?.vocab || ["gm", "fam"],
+      name: room?.name || roomId
+   };
+}
+
+// Initial load
+loadProjectConfig();
 
 const FALLBACK = {
    cys: "How are you doing?",
@@ -32,7 +55,10 @@ function registerDiscordTopicRoute(app) {
 
          const sample = (Array.isArray(examples) ? examples : []).slice(0, 10);
          const sampleText = sample.map((m, i) => `${i + 1}. ${m.username}: ${sanitizeText(m.reply || "")}`).join("\n");
-         const vocab = COMMUNITY_VOCAB[roomId] || ["gm", "fam"];
+
+         // Get room config from project.json
+         const roomConfig = getRoomConfig(roomId);
+         const vocab = roomConfig.vocab;
 
          // Get time-based context for realistic topic starters
          const timeContext = getUserTimeContext();

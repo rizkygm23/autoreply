@@ -27,15 +27,15 @@ let roomInfoMap = {};
 const FALLBACK_PROJECT_DATA = {
   "apiBaseUrl": "http://localhost:3000",
   "rooms": [
-    { "id": "rialo", "icon": "🏛️", "name": "Rialo", "desc": "Rialo Community" },
-    { "id": "lighter", "icon": "💡", "name": "Lighter", "desc": "Lighter Community" },
-    { "id": "creek", "icon": "🌊", "name": "Creek", "desc": "Creek Community" },
-    { "id": "cys", "icon": "🎯", "name": "Cysic", "desc": "Cysic Community" },
-    { "id": "town", "icon": "🏘️", "name": "Town", "desc": "Town Community" },
-    { "id": "fgo", "icon": "🎮", "name": "FGO", "desc": "FGO Community" },
-    { "id": "mmt", "icon": "🚀", "name": "MMT", "desc": "MMT Community" },
-    { "id": "mega", "icon": "⚡", "name": "Mega", "desc": "Mega Community" },
-    { "id": "seismic", "icon": "🌍", "name": "Seismic", "desc": "Seismic Community" }
+    { "id": "rialo", "icon": "🏛️", "name": "Rialo", "desc": "Rialo Community", "emojis": [], "vocab": ["Rialo", "gm", "fam"] },
+    { "id": "lighter", "icon": "💡", "name": "Lighter", "desc": "Lighter Community", "emojis": [], "vocab": ["Lighter", "gm", "fam"] },
+    { "id": "creek", "icon": "🌊", "name": "Creek", "desc": "Creek Community", "emojis": [], "vocab": ["Creek", "gm", "fam"] },
+    { "id": "cys", "icon": "🎯", "name": "Cysic", "desc": "Cysic Community", "emojis": [":CysicSymbol_Coloronwhite2x:", ":pepeLove:", ":pepe_pray:", ":pogcat:"], "vocab": ["Cysors", "gmsor", "fam", "gm", "wen", "zk"] },
+    { "id": "town", "icon": "🏘️", "name": "Town", "desc": "Town Community", "emojis": [], "vocab": ["Town", "gm", "fam"] },
+    { "id": "fgo", "icon": "🎮", "name": "FGO", "desc": "FGO Community", "emojis": [], "vocab": ["Fogo", "gm", "fam"] },
+    { "id": "mmt", "icon": "🚀", "name": "MMT", "desc": "MMT Community", "emojis": [], "vocab": ["MMT", "fam", "gm"] },
+    { "id": "mega", "icon": "⚡", "name": "Mega", "desc": "Mega Community", "emojis": [], "vocab": ["Mega", "gm", "fam"] },
+    { "id": "seismic", "icon": "🌍", "name": "Seismic", "desc": "Seismic Community", "emojis": [], "vocab": ["Seismic", "gm", "fam"] }
   ]
 };
 
