@@ -1,7 +1,7 @@
 import path from "path";
 import { startSpinner, logInfo, logOk, logErr, logWarn, COLORS } from "../../lib/logger.js";
 import { sanitizeText, removeContractions, extractNickname, getUserTimeContext } from "../../lib/helpers.js";
-import { DATA_DIR, saveEntryToJSON, loadJSON } from "../../lib/storage.js";
+import { DATA_DIR, saveEntryToJSON, loadJSON, getRecentResponsesText, isResponseDuplicate, saveResponseToMemory } from "../../lib/storage.js";
 import { generateReplyFromGrok } from "../../services/aiService.js";
 
 const cysEmoji = [
@@ -66,6 +66,10 @@ function registerDiscordReplyRoute(app) {
         return `## Example ${idx + 1}\nMessage: "${sender}${cleanedCaption}"\nReplies:\n${kom}`;
       })
       .join("\n\n");
+
+    // Get recent responses to avoid repetition
+    const recentResponsesText = getRecentResponsesText("discord", roomId);
+    logInfo(`${COLORS.cyan}${req._id}${COLORS.reset} 🧠 Memory: ${recentResponsesText ? 'has recent responses' : 'empty'}`);
 
     const prompt = `
 <system_configuration>
@@ -306,6 +310,13 @@ Specific Rules:
   * Example BAD reply: "hey encrypted, get some rest soon, alright" ← This sounds like a BOT
   * Example GOOD reply: "get some rest bro" ← This sounds HUMAN (no name used)
   * Example GOOD reply: "gm" or "gm ${nickname || ''}" ← Pure greeting is OK
+
+- ANTI-REPETITION RULE (CRITICAL):
+  * You have used these responses recently - DO NOT USE THEM AGAIN:
+${recentResponsesText || "  (no recent responses yet)"}
+  * Create a FRESH and DIFFERENT response each time
+  * Vary your word choice, sentence structure, and expressions
+  * If you see "all good" in recent responses, try "doing well", "vibing", "chillin" etc instead
 `;
 
     const spinner = startSpinner(`${req._id} /generate-discord`, "AI thinking");
@@ -318,16 +329,27 @@ Specific Rules:
       const wordCount = trimmed ? trimmed.split(/\s+/).length : 0;
       const hasSoundWord = /\b(sound|sounds|sounding|sounded)\b/i.test(trimmed);
 
+      // Check for duplicate/too similar response
+      const isDuplicate = isResponseDuplicate("discord", roomId, trimmed);
+
       if (
         !trimmed ||
         trimmed.length < 5 ||
         trimmed.includes(caption.trim()) ||
         wordCount > 12 ||
-        hasSoundWord
+        hasSoundWord ||
+        isDuplicate
       ) {
-        spinner.stop(false, `${COLORS.red}invalid reply${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
-        return res.status(500).json({ error: "Reply not valid" });
+        const reason = isDuplicate ? "duplicate response" : "invalid reply";
+        spinner.stop(false, `${COLORS.red}${reason}${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
+        if (isDuplicate) {
+          logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} 🔄 Response too similar to recent: "${trimmed}"`);
+        }
+        return res.status(500).json({ error: isDuplicate ? "Response too similar to recent" : "Reply not valid" });
       }
+
+      // Save successful response to memory
+      saveResponseToMemory("discord", roomId, trimmed);
 
       spinner.stop(true, `${COLORS.green}ok${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
       logOk(`${COLORS.cyan}${req._id}${COLORS.reset} Discord reply: ${COLORS.gray}"${trimmed}"${COLORS.reset}`);

@@ -255,7 +255,17 @@ class ApiClient {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // Try to get error message from response body
+        let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMsg = errorData.error;
+          }
+        } catch (parseErr) {
+          // Ignore JSON parse error, use default message
+        }
+        throw new Error(errorMsg);
       }
 
       const data = await response.json();
@@ -280,9 +290,22 @@ class ApiClient {
   }
 
   shouldRetry(error) {
-    return error.name === 'AbortError' ||
+    // Retry on network errors
+    if (error.name === 'AbortError' ||
       error.message.includes('Failed to fetch') ||
-      error.message.includes('NetworkError');
+      error.message.includes('NetworkError')) {
+      return true;
+    }
+
+    // Also retry when response is too similar to recent (server detected duplicate)
+    if (error.message.includes('too similar') ||
+      error.message.includes('duplicate') ||
+      error.message.includes('Response too similar')) {
+      console.log('[Gemini Discord] 🔄 Retrying due to duplicate response...');
+      return true;
+    }
+
+    return false;
   }
 
   delay(ms) {
