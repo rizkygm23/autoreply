@@ -32,7 +32,7 @@ async function checkAIConnection() {
 
     if (completion && completion.choices && completion.choices[0]) {
       console.log(`\x1b[32m[AI Check] ✅ xAI API connected successfully! (${elapsed}ms)\x1b[0m`);
-      console.log(`\x1b[90m[AI Check] Model: grok-3-fast | Response: "${completion.choices[0].message.content}"\x1b[0m`);
+      console.log(`\x1b[90m[AI Check] Model: "${completion.model}" | Response: "${completion.choices[0].message.content}"\x1b[0m`);
       return true;
     } else {
       console.log("\x1b[31m[AI Check] ❌ Unexpected response from xAI\x1b[0m");
@@ -53,7 +53,7 @@ async function generateReplyFromGrok(prompt) {
   try {
     console.log("[Grok] Sending request to xAI...");
     const completion = await openai.chat.completions.create({
-      model: "grok-3-fast",
+      model: "grok-4-1-fast-non-reasoning",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.7,
     });
