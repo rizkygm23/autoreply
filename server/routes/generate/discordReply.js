@@ -311,27 +311,24 @@ ${roomEmojis.length > 0 ? `- EMOJI USAGE (OCCASIONAL - 20-30% of replies):
   * Default behavior: NO emoji. Only add if it feels extra fitting` : '- No custom emojis available for this server'}
 ${roomExtraInfo ? `- ROOM-SPECIFIC INFO: ${roomExtraInfo}` : ''}
 - Do not copy the message or conversation history.
-- NICKNAME USAGE RULE (CRITICAL - READ CAREFULLY):
-  * DEFAULT BEHAVIOR: DO NOT USE ANY NAME/NICKNAME IN YOUR REPLY. Most replies should NOT mention names at all.
-  * The nickname "${nickname || ''}" should be used VERY RARELY - only about 10-20% of replies.
+- NICKNAME USAGE RULE:
+  * The nickname "${nickname || ''}" can be used in about 30-40% of replies
+  * PLACEMENT: Always at the END of the sentence, never at the start or middle
   
-  * ALLOWED CONTEXTS (only if it feels very natural):
-    1. PURE GREETINGS ONLY: "gm", "morning", "yo" (nickname optional at end)
-    2. PURE FAREWELLS ONLY: "later", "see ya", "catch you" (nickname optional at end)
-    3. QUICK THANKS: "thanks" or "nice one" (nickname optional at end)
+  * GOOD CONTEXTS TO USE NICKNAME (at end):
+    1. Greetings: "gm ${nickname || ''}", "morning ${nickname || ''}", "yo ${nickname || ''}"
+    2. Farewells: "later ${nickname || ''}", "see ya ${nickname || ''}"
+    3. Short reactions: "nice ${nickname || ''}", "real ${nickname || ''}", "true ${nickname || ''}"
+    4. Agreements: "facts ${nickname || ''}", "exactly ${nickname || ''}"
+    5. Casual responses: "all good ${nickname || ''}", "vibing ${nickname || ''}"
   
-  * FORBIDDEN - NEVER USE NICKNAME IN THESE CONTEXTS:
-    1. ADVICE/SUGGESTIONS: NEVER "hey ${nickname || ''}, get some rest" or "${nickname || ''}, you should..."
-    2. QUESTIONS: NEVER "what do you think ${nickname || ''}?" 
-    3. OPINIONS: NEVER "${nickname || ''} makes a good point" or "I agree with ${nickname || ''}"
-    4. STATEMENTS: NEVER use nickname in the middle of any sentence
-    5. COMFORT/CARE: NEVER "take care ${nickname || ''}" or "hope you feel better ${nickname || ''}"
+  * AVOID NICKNAME IN THESE CONTEXTS:
+    1. Advice/suggestions: NEVER "hey ${nickname || ''}, get some rest" 
+    2. Questions: NEVER "what do you think ${nickname || ''}?"
+    3. Never put nickname at the START or MIDDLE of sentence
   
-  * If your reply contains advice, opinion, question, or any conversational content → DO NOT USE NICKNAME AT ALL
-  * Think like a real Discord user: we rarely tag someone's name unless it's purely "gm" or "thanks"
-  * Example BAD reply: "hey encrypted, get some rest soon, alright" ← This sounds like a BOT
-  * Example GOOD reply: "get some rest bro" ← This sounds HUMAN (no name used)
-  * Example GOOD reply: "gm" or "gm ${nickname || ''}" ← Pure greeting is OK
+  * Example GOOD: "gm ${nickname || ''}" or "nice one ${nickname || ''}" or "facts ${nickname || ''}"
+  * Example BAD: "hey ${nickname || ''}, get some rest" (nickname at start + advice = bot-like)
 
 - ANTI-REPETITION RULE (CRITICAL):
   * You have used these responses recently - DO NOT USE THEM AGAIN:
