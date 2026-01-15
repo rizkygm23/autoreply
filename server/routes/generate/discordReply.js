@@ -301,14 +301,14 @@ Recent replies: ${historyText || "(no history yet)"}
 New message from ${nickname || username || 'User'}: "${caption}"
 
 Specific Rules:
-${roomEmojis.length > 0 ? `- EMOJI USAGE (OPTIONAL - USE SPARINGLY):
+${roomEmojis.length > 0 ? `- EMOJI USAGE (USE FREQUENTLY - 50-70% of replies):
   * Available custom emojis for this server: ${JSON.stringify(roomEmojis)}
-  * Only use emoji if it GENUINELY fits the context and adds value
-  * DO NOT force emojis - most replies should be text-only
-  * Good contexts for emoji: excited reactions, celebrations, showing support, playful responses
-  * Bad contexts for emoji: serious discussions, technical questions, neutral statements
-  * Maximum 1 emoji per reply, placed at the end if used
-  * When in doubt, skip the emoji` : '- No custom emojis available for this server'}
+  * ACTIVELY look for opportunities to use emojis - they make replies feel more Discord-native
+  * USE emoji for: greetings, reactions, support, hype, casual chat, agreement, playful moments
+  * SKIP emoji only for: very serious/negative topics, technical explanations
+  * Maximum 1-2 emojis per reply, can be at start, middle, or end
+  * Default behavior: INCLUDE an emoji unless the context is clearly serious
+  * Emojis make you sound more human and engaged - use them!` : '- No custom emojis available for this server'}
 ${roomExtraInfo ? `- ROOM-SPECIFIC INFO: ${roomExtraInfo}` : ''}
 - Do not copy the message or conversation history.
 - NICKNAME USAGE RULE (CRITICAL - READ CAREFULLY):

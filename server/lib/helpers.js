@@ -229,9 +229,9 @@ function getUserTimeContext() {
       reason = ["weekend means flexible schedule", "love the quiet morning hours", "catching up on web3 news before everyone wakes up"];
     } else {
       mood = ["groggy but getting ready", "slowly waking up", "morning zombie mode"];
-      condition = ["need coffee badly", "preparing for classes later", "checking notifications first thing"];
+      condition = ["need coffee badly", "getting ready for the day", "checking notifications first thing"];
       activities = ["quick discord check before getting ready", "reviewing today's tasks", "reading overnight messages"];
-      reason = ["early prep for campus schedule", "want to clear notifications before class", "morning grind starts early"];
+      reason = ["early prep for a busy day", "want to clear notifications first", "morning grind starts early"];
     }
   }
 
@@ -247,9 +247,9 @@ function getUserTimeContext() {
       reason = ["weekend = personal project time", "no campus pressure today", "best time for creative work"];
     } else {
       mood = ["energized", "ready for the day", "motivated morning mode"];
-      condition = ["fresh and focused", "campus-ready mindset", "good energy"];
-      activities = ["checking crypto news", "quick community engagement", "preparing for lectures"];
-      reason = ["morning lecture schedule", "peak focus hours", "gotta stay updated before class"];
+      condition = ["fresh and focused", "ready to get stuff done", "good energy"];
+      activities = ["checking crypto news", "quick community engagement", "catching up on project updates"];
+      reason = ["weekday morning hustle", "peak focus hours", "gotta stay updated"];
     }
   }
 
@@ -264,10 +264,10 @@ function getUserTimeContext() {
       activities = ["creating artwork", "writing articles", "web3 project contributions"];
       reason = ["peak creative hours", "weekend project grinding", "best time for focused work"];
     } else {
-      mood = ["focused but tired from lectures", "post-class energy", "need a break soon"];
-      condition = ["semi-focused", "class brain fog", "looking forward to break"];
-      activities = ["quick discord breaks between classes", "reading project updates", "light engagement"];
-      reason = ["campus lectures in progress", "sneaking phone during boring class", "mental break needed"];
+      mood = ["focused but getting tired", "grinding through tasks", "need a break soon"];
+      condition = ["semi-focused", "bit of brain fog", "looking forward to break"];
+      activities = ["quick discord breaks between tasks", "reading project updates", "light engagement"];
+      reason = ["busy morning taking a toll", "multitasking mode", "mental break needed"];
     }
   }
 
@@ -293,10 +293,10 @@ function getUserTimeContext() {
       activities = ["web3 project work", "community contributions", "discord moderation help"];
       reason = ["best afternoon hours for contributions", "catching up with community", "project deadline vibes"];
     } else {
-      mood = ["post-lunch slowdown", "afternoon class drag", "counting hours"];
-      condition = ["a bit sleepy", "class fatigue", "looking forward to evening"];
-      activities = ["surviving afternoon classes", "quick phone checks", "planning evening tasks"];
-      reason = ["afternoon lectures are tough", "body wants to nap", "campus grind continues"];
+      mood = ["post-lunch slowdown", "afternoon drag", "counting hours"];
+      condition = ["a bit sleepy", "afternoon fatigue", "looking forward to evening"];
+      activities = ["getting through afternoon tasks", "quick phone checks", "planning evening tasks"];
+      reason = ["afternoons are always tough", "body wants to nap", "grinding through"];
     }
   }
 
@@ -305,10 +305,10 @@ function getUserTimeContext() {
     period = "evening";
     greeting = "evening";
     energy = "refreshed";
-    mood = ["relaxed and free", "finally off campus mode", "evening productivity"];
+    mood = ["relaxed and free", "finally winding down", "evening productivity"];
     condition = ["winding down but active", "chill vibes", "peak social hours"];
     activities = ["full discord engagement", "community chatting", "working on artwork", "writing drafts"];
-    reason = ["campus done for the day", "prime time for web3 engagement", "evening is contribution time"];
+    reason = ["day is winding down", "prime time for web3 engagement", "evening is contribution time"];
   }
 
   // === NIGHT PRIME: 20:00 - 22:59 ===
@@ -379,7 +379,9 @@ Energy level: ${energy}
 What I'm doing: ${pick(activities)}
 Why: ${pick(reason)}
 
-USER PROFILE: IT student semester 5, active Web3 contributor (artwork, articles, community engagement on Discord/Twitter)
+USER PROFILE: Active Web3 contributor (artwork, articles, community engagement on Discord/Twitter)
+
+IMPORTANT: Do NOT mention college, university, lectures, classes, campus, studying, assignments, or school-related topics UNLESS the user EXPLICITLY asks about it first. Your default persona is a Web3 enthusiast, not a student. Only reveal student status if directly asked "are you a student?", "what do you study?", etc.
 
 INSTRUCTION: When replying to questions like "how are you?", "what's up?", "busy?", "capek ga?", "apa kabar?", etc., incorporate this time context naturally. Make responses feel authentic to my current state and schedule. Don't be overly descriptive - just let it subtly influence the tone and energy of responses.`
   };
