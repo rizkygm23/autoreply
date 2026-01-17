@@ -2,18 +2,82 @@ import { startSpinner, logOk, logErr, logWarn, COLORS } from "../../lib/logger.j
 import { sanitizeText, removeContractions } from "../../lib/helpers.js";
 import { generateReplyFromGrok } from "../../services/aiService.js";
 
+// Quick Chat Template configurations
+const QUICK_CHAT_PROMPTS = {
+   origin: "conversation starter asking where someone is from",
+   timezone: "conversation starter asking about timezone",
+   hobby: "conversation starter asking about hobbies and interests",
+   crypto_interest: "conversation starter asking how they got into crypto",
+   project_opinion: "conversation starter asking why they're interested in the project",
+   gm: "good morning greeting",
+   gn: "good night farewell",
+   welcome: "welcoming a new member",
+   favorite_chain: "conversation starter asking about favorite blockchain",
+   how_long: "conversation starter asking how long in crypto space",
+   plans: "conversation starter asking about future plans",
+   nft: "conversation starter asking about NFT interests",
+   experience: "conversation starter asking about their background",
+   alpha: "conversation starter asking about alpha or tips",
+   music: "conversation starter asking about music taste"
+};
+
 function registerQuickReplyRoute(app) {
    app.post("/generate-quick", async (req, res) => {
-      const { caption, roomId, username } = req.body;
+      const { caption, roomId, username, quickTemplate, quickMessage } = req.body;
 
-      if (!caption || !roomId) {
-         logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing caption/roomId on /generate-quick`);
-         return res.status(400).json({ error: "caption and roomId are required" });
+      // If quickTemplate is provided, we have a predefined template to enhance
+      const isQuickChat = !!quickTemplate && !!quickMessage;
+
+      if (!roomId) {
+         logWarn(`${COLORS.cyan}${req._id}${COLORS.reset} Missing roomId on /generate-quick`);
+         return res.status(400).json({ error: "roomId is required" });
       }
 
-      const spinner = startSpinner(`${req._id} /generate-quick`, "AI thinking");
+      const spinner = startSpinner(`${req._id} /generate-quick${isQuickChat ? ` (${quickTemplate})` : ""}`, "AI thinking");
+
       try {
-         const prompt = `
+         let prompt;
+
+         if (isQuickChat) {
+            // Quick Chat Template mode - enhance the predefined template
+            const templateDesc = QUICK_CHAT_PROMPTS[quickTemplate] || "conversation starter";
+
+            prompt = `
+You are a friendly member of the "${roomId}" crypto community on Discord.
+
+TASK: Generate a natural, friendly variation of the following ${templateDesc}.
+
+ORIGINAL TEMPLATE: "${quickMessage}"
+TARGET USER: ${username || 'friend'}
+
+RULES:
+1. STRICTLY LOWERCASE only.
+2. Keep it casual, friendly, and natural.
+3. Maximum 1-2 short sentences.
+4. Use casual internet slang: "u", "ur", "cuz", "tho", "kinda", "tbh".
+5. NO emojis, NO hashtags.
+6. Grammar should be slightly imperfect but readable.
+7. Make it sound like a real person typing, not a bot.
+8. Don't use contractions with apostrophe s (use "what is", "how is" instead of "what's", "how's").
+9. Keep the core intent of the original template but vary the wording naturally.
+10. NO ending period.
+
+EXAMPLES OF GOOD OUTPUT:
+- "hey ${username || 'friend'}, where u from"
+- "yo ${username || 'friend'} what timezone u in"
+- "curious ${username || 'friend'}, how did u get into crypto"
+- "gm ${username || 'friend'}, how is ur day going"
+
+OUTPUT: Return ONLY the message text, nothing else.
+`.trim();
+         } else {
+            // Regular quick reply mode
+            if (!caption) {
+               spinner.stop(false, `${COLORS.red}missing caption${COLORS.reset}`);
+               return res.status(400).json({ error: "caption is required for regular quick reply" });
+            }
+
+            prompt = `
 <system_configuration>
 <vocabulary_control>
        * RULE: USE GRADE 8 ENGLISH.
@@ -214,6 +278,7 @@ Tweet/Message from ${username || 'User'}: "${sanitizeText(caption)}"
 Output:
 One sentence reply only.
 `.trim();
+         }
 
          const aiResponse = await generateReplyFromGrok(prompt);
          const reply = removeContractions(aiResponse.content);
@@ -225,7 +290,7 @@ One sentence reply only.
          }
 
          spinner.stop(true, `${COLORS.green}ok${COLORS.reset} ${COLORS.dim}(${elapsed} ms)${COLORS.reset}`);
-         logOk(`${COLORS.cyan}${req._id}${COLORS.reset} Quick reply: ${COLORS.gray}"${reply.trim()}"${COLORS.reset}`);
+         logOk(`${COLORS.cyan}${req._id}${COLORS.reset} Quick reply${isQuickChat ? ` (${quickTemplate})` : ""}: ${COLORS.gray}"${reply.trim()}"${COLORS.reset}`);
          res.json({ reply });
       } catch (err) {
          const elapsed = Date.now() - req._t0;

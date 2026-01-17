@@ -1122,9 +1122,31 @@ function addReplyButtonToMessage(message) {
     }
   };
 
-  // ===== Quick Actions =====
+  // ===== Quick Chat Templates =====
+  const QUICK_CHAT_TEMPLATES = [
+    { id: 'origin', label: '🌍 Ask Origin', template: "Hey {username}! Where are you from?" },
+    { id: 'timezone', label: '🕐 Ask Timezone', template: "Yo {username}! What timezone are you in?" },
+    { id: 'hobby', label: '🎮 Ask Hobby', template: "What do you like to do for fun, {username}?" },
+    { id: 'crypto_interest', label: '💰 Crypto Interest', template: "How did you get into crypto, {username}?" },
+    { id: 'project_opinion', label: '📊 Project Opinion', template: "What got you interested in this project, {username}?" },
+    { id: 'gm', label: '☀️ Good Morning', template: "GM {username}! How's your day going?" },
+    { id: 'gn', label: '🌙 Good Night', template: "GN {username}! Rest well and see you tomorrow!" },
+    { id: 'welcome', label: '👋 Welcome', template: "Welcome to the community, {username}! Great to have you here!" },
+    { id: 'favorite_chain', label: '⛓️ Favorite Chain', template: "What's your favorite blockchain, {username}?" },
+    { id: 'how_long', label: '📅 How Long Here', template: "How long have you been in the crypto space, {username}?" },
+    { id: 'plans', label: '🚀 Future Plans', template: "What are your plans for this year, {username}?" },
+    { id: 'nft', label: '🖼️ NFT Interest', template: "Are you into NFTs, {username}? What's your favorite collection?" },
+    { id: 'experience', label: '💼 Experience', template: "What's your background, {username}? Dev, trader, or just vibing?" },
+    { id: 'alpha', label: '🔥 Alpha Hunter', template: "Any good alpha lately, {username}?" },
+    { id: 'music', label: '🎵 Music Taste', template: "What kind of music do you listen to, {username}?" }
+  ];
+
+  // ===== Quick Actions with Dropdown =====
+  const quickContainer = document.createElement("div");
+  quickContainer.style.cssText = `position: relative; display: inline-block;`;
+
   const quickBtn = document.createElement("button");
-  quickBtn.innerText = "⚡ Quick";
+  quickBtn.innerText = "⚡ Quick ▾";
   quickBtn.style.cssText = `
     background: ${CONFIG.THEME.success};
     color: white;
@@ -1135,35 +1157,125 @@ function addReplyButtonToMessage(message) {
     font-size: 12px;
     font-weight: 500;
     transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
   `;
-  quickBtn.onclick = async () => {
 
-    const roomId = getSelectedRoomId();
-    if (!roomId) {
-      showNotification("Please select a room first", "error");
-      return;
-    }
+  // Create dropdown menu for quick chat
+  const quickDropdown = document.createElement("div");
+  quickDropdown.className = "gemini-quick-dropdown";
+  quickDropdown.style.cssText = `
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: #2b2d31;
+    border: 1px solid #3b3d43;
+    border-radius: 8px;
+    min-width: 220px;
+    max-height: 300px;
+    overflow-y: auto;
+    box-shadow: 0 12px 24px rgba(0,0,0,0.45);
+    z-index: 2147483647;
+    display: none;
+  `;
 
-    setBtnLoading(quickBtn, true);
-    try {
-      const data = await apiClient.request("/generate-quick", {
-        method: "POST",
-        body: JSON.stringify({ caption, roomId, username })
-      });
+  // Add quick chat template options
+  QUICK_CHAT_TEMPLATES.forEach((template) => {
+    const option = document.createElement("div");
+    option.style.cssText = `
+      padding: 10px 12px;
+      font-size: 12px;
+      color: #e7e9ea;
+      cursor: pointer;
+      transition: background 120ms ease;
+      white-space: nowrap;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      border-bottom: 1px solid #3b3d4355;
+    `;
+    option.innerHTML = `
+      <span style="font-weight: 500;">${template.label}</span>
+      <span style="font-size: 10px; opacity: 0.7; white-space: normal;">${template.template.replace('{username}', '(name)')}</span>
+    `;
 
-      latestReply = data.reply || "Quick reply generated!";
-      await copyToClipboard(latestReply);
+    option.addEventListener("mouseenter", () => (option.style.background = "rgba(88,101,242,.2)"));
+    option.addEventListener("mouseleave", () => (option.style.background = "transparent"));
 
-      if (settings.get('notifications')) {
-        showNotification("Quick reply generated!", "success");
+    option.addEventListener("click", async () => {
+      quickDropdown.style.display = "none";
+
+      const roomId = getSelectedRoomId();
+      if (!roomId) {
+        showNotification("Please select a room first", "error");
+        return;
       }
 
-      setBtnLoading(quickBtn, false, "✅");
-    } catch (err) {
-      console.error("Quick generate error:", err);
-      setBtnLoading(quickBtn, false, "❌");
-    }
+      // Replace {username} with actual username
+      const quickMessage = template.template.replace('{username}', username || 'friend');
+
+      setBtnLoading(quickBtn, true);
+      try {
+        const data = await apiClient.request("/generate-quick", {
+          method: "POST",
+          body: JSON.stringify({
+            caption,
+            roomId,
+            username,
+            quickTemplate: template.id,
+            quickMessage
+          })
+        });
+
+        latestReply = data.reply || quickMessage;
+        await copyToClipboard(latestReply);
+
+        if (settings.get('notifications')) {
+          showNotification(`Quick chat "${template.label}" copied!`, "success");
+        }
+
+        setBtnLoading(quickBtn, false, "✅");
+      } catch (err) {
+        console.error("Quick generate error:", err);
+        // Fallback: just copy the template directly
+        await copyToClipboard(quickMessage);
+        showNotification(`Template copied: ${template.label}`, "success");
+        setBtnLoading(quickBtn, false, "✅");
+      }
+    });
+
+    quickDropdown.appendChild(option);
+  });
+
+  // Remove last border
+  if (quickDropdown.lastChild) {
+    quickDropdown.lastChild.style.borderBottom = "none";
+  }
+
+  // Toggle dropdown on button click
+  quickBtn.onclick = (e) => {
+    e.stopPropagation();
+    const isVisible = quickDropdown.style.display === "block";
+
+    // Close all other quick dropdowns first
+    document.querySelectorAll('.gemini-quick-dropdown').forEach(dd => {
+      dd.style.display = "none";
+    });
+
+    quickDropdown.style.display = isVisible ? "none" : "block";
   };
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!quickContainer.contains(e.target)) {
+      quickDropdown.style.display = "none";
+    }
+  });
+
+  quickContainer.appendChild(quickBtn);
+  quickContainer.appendChild(quickDropdown);
 
   // Settings button removed - functionality moved to Analytics panel
 
@@ -1184,7 +1296,7 @@ function addReplyButtonToMessage(message) {
   debugBtn.onclick = () => debugMessageDetection(message);
 
   row.appendChild(genBtn);
-  row.appendChild(quickBtn);
+  row.appendChild(quickContainer);
   row.appendChild(debugBtn);
 
   wrapper.appendChild(roomDisplay);
