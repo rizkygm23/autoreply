@@ -39,34 +39,50 @@ function registerQuickReplyRoute(app) {
          let prompt;
 
          if (isQuickChat) {
-            // Quick Chat Template mode - enhance the predefined template
+            // Quick Chat mode - context-aware conversation starter
             const templateDesc = QUICK_CHAT_PROMPTS[quickTemplate] || "conversation starter";
+            const contextInfo = caption ? `\nCONTEXT FROM THEIR MESSAGE: "${sanitizeText(caption)}"` : "";
 
             prompt = `
 You are a friendly member of the "${roomId}" crypto community on Discord.
 
-TASK: Generate a natural, friendly variation of the following ${templateDesc}.
+TASK: Generate a CONTEXT-AWARE ${templateDesc} message to ${username || 'this user'}.
+${contextInfo}
 
-ORIGINAL TEMPLATE: "${quickMessage}"
-TARGET USER: ${username || 'friend'}
+QUICK CHAT TYPE: ${quickTemplate}
+- origin: Ask where they're from, can relate to something they mentioned
+- timezone: Ask their timezone, maybe mention when you're active
+- hobby: Ask about hobbies/interests, connect to context if possible
+- crypto_interest: Ask how/why they got into crypto
+- project_opinion: Ask what interests them about this project
+- gm: Good morning greeting, can reference their recent activity
+- gn: Good night farewell
+- welcome: Welcome them if they seem new
+- favorite_chain: Ask about favorite blockchain
+- how_long: Ask how long they've been in crypto
+- plans: Ask about their plans/goals
+- nft: Ask about NFT interests
+- experience: Ask about their background (dev, trader, etc)
+- alpha: Ask if they have any alpha/tips to share
+- music: Ask about music taste
 
-RULES:
+IMPORTANT RULES:
 1. STRICTLY LOWERCASE only.
-2. Keep it casual, friendly, and natural.
+2. MUST be context-aware - if they mentioned something, reference it naturally.
 3. Maximum 1-2 short sentences.
 4. Use casual internet slang: "u", "ur", "cuz", "tho", "kinda", "tbh".
 5. NO emojis, NO hashtags.
 6. Grammar should be slightly imperfect but readable.
 7. Make it sound like a real person typing, not a bot.
 8. Don't use contractions with apostrophe s (use "what is", "how is" instead of "what's", "how's").
-9. Keep the core intent of the original template but vary the wording naturally.
-10. NO ending period.
+9. NO ending period.
+10. Don't just copy the template - make it CONTEXTUAL and NATURAL.
 
-EXAMPLES OF GOOD OUTPUT:
-- "hey ${username || 'friend'}, where u from"
-- "yo ${username || 'friend'} what timezone u in"
-- "curious ${username || 'friend'}, how did u get into crypto"
-- "gm ${username || 'friend'}, how is ur day going"
+EXAMPLES OF CONTEXT-AWARE OUTPUT:
+- If they mentioned ETH and you're asking origin: "nice, ur into eth too, where u from btw"
+- If they said gm and you're asking timezone: "gm, what timezone u in, trying to catch u online"
+- If they're talking about a project: "this project looks cool, how did u first get into crypto"
+- If they seem excited: "love the energy, what got u interested in this project"
 
 OUTPUT: Return ONLY the message text, nothing else.
 `.trim();

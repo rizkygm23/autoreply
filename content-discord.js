@@ -1122,23 +1122,23 @@ function addReplyButtonToMessage(message) {
     }
   };
 
-  // ===== Quick Chat Templates =====
+  // ===== Quick Chat Templates (Context-Aware) =====
   const QUICK_CHAT_TEMPLATES = [
-    { id: 'origin', label: '🌍 Ask Origin', template: "Hey {username}! Where are you from?" },
-    { id: 'timezone', label: '🕐 Ask Timezone', template: "Yo {username}! What timezone are you in?" },
-    { id: 'hobby', label: '🎮 Ask Hobby', template: "What do you like to do for fun, {username}?" },
-    { id: 'crypto_interest', label: '💰 Crypto Interest', template: "How did you get into crypto, {username}?" },
-    { id: 'project_opinion', label: '📊 Project Opinion', template: "What got you interested in this project, {username}?" },
-    { id: 'gm', label: '☀️ Good Morning', template: "GM {username}! How's your day going?" },
-    { id: 'gn', label: '🌙 Good Night', template: "GN {username}! Rest well and see you tomorrow!" },
-    { id: 'welcome', label: '👋 Welcome', template: "Welcome to the community, {username}! Great to have you here!" },
-    { id: 'favorite_chain', label: '⛓️ Favorite Chain', template: "What's your favorite blockchain, {username}?" },
-    { id: 'how_long', label: '📅 How Long Here', template: "How long have you been in the crypto space, {username}?" },
-    { id: 'plans', label: '🚀 Future Plans', template: "What are your plans for this year, {username}?" },
-    { id: 'nft', label: '🖼️ NFT Interest', template: "Are you into NFTs, {username}? What's your favorite collection?" },
-    { id: 'experience', label: '💼 Experience', template: "What's your background, {username}? Dev, trader, or just vibing?" },
-    { id: 'alpha', label: '🔥 Alpha Hunter', template: "Any good alpha lately, {username}?" },
-    { id: 'music', label: '🎵 Music Taste', template: "What kind of music do you listen to, {username}?" }
+    { id: 'origin', label: '🌍 Ask Origin', desc: "Ask where they're from based on context" },
+    { id: 'timezone', label: '🕐 Ask Timezone', desc: "Ask their timezone naturally" },
+    { id: 'hobby', label: '🎮 Ask Hobby', desc: "Ask about hobbies/interests" },
+    { id: 'crypto_interest', label: '💰 Crypto Interest', desc: "Ask how they got into crypto" },
+    { id: 'project_opinion', label: '📊 Project Opinion', desc: "Ask why they like this project" },
+    { id: 'gm', label: '☀️ Good Morning', desc: "Context-aware GM greeting" },
+    { id: 'gn', label: '🌙 Good Night', desc: "Context-aware GN farewell" },
+    { id: 'welcome', label: '👋 Welcome', desc: "Welcome them to community" },
+    { id: 'favorite_chain', label: '⛓️ Favorite Chain', desc: "Ask about favorite blockchain" },
+    { id: 'how_long', label: '📅 How Long Here', desc: "Ask how long in crypto space" },
+    { id: 'plans', label: '🚀 Future Plans', desc: "Ask about their goals/plans" },
+    { id: 'nft', label: '🖼️ NFT Interest', desc: "Ask about NFT interests" },
+    { id: 'experience', label: '💼 Experience', desc: "Ask about their background" },
+    { id: 'alpha', label: '🔥 Alpha Hunter', desc: "Ask for alpha/tips" },
+    { id: 'music', label: '🎵 Music Taste', desc: "Ask about music preferences" }
   ];
 
   // ===== Quick Actions with Dropdown =====
@@ -1162,24 +1162,24 @@ function addReplyButtonToMessage(message) {
     gap: 4px;
   `;
 
-  // Create dropdown menu for quick chat
+  // Create dropdown menu for quick chat (appended to body for proper z-index)
   const quickDropdown = document.createElement("div");
   quickDropdown.className = "gemini-quick-dropdown";
   quickDropdown.style.cssText = `
-    position: absolute;
-    top: 100%;
-    left: 0;
-    margin-top: 4px;
+    position: fixed;
     background: #2b2d31;
     border: 1px solid #3b3d43;
     border-radius: 8px;
-    min-width: 220px;
-    max-height: 300px;
+    min-width: 250px;
+    max-height: 350px;
     overflow-y: auto;
-    box-shadow: 0 12px 24px rgba(0,0,0,0.45);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.6);
     z-index: 2147483647;
     display: none;
   `;
+
+  // Append dropdown to body for proper layering
+  document.body.appendChild(quickDropdown);
 
   // Add quick chat template options
   QUICK_CHAT_TEMPLATES.forEach((template) => {
@@ -1198,7 +1198,7 @@ function addReplyButtonToMessage(message) {
     `;
     option.innerHTML = `
       <span style="font-weight: 500;">${template.label}</span>
-      <span style="font-size: 10px; opacity: 0.7; white-space: normal;">${template.template.replace('{username}', '(name)')}</span>
+      <span style="font-size: 10px; opacity: 0.7; white-space: normal;">${template.desc}</span>
     `;
 
     option.addEventListener("mouseenter", () => (option.style.background = "rgba(88,101,242,.2)"));
@@ -1213,9 +1213,6 @@ function addReplyButtonToMessage(message) {
         return;
       }
 
-      // Replace {username} with actual username
-      const quickMessage = template.template.replace('{username}', username || 'friend');
-
       setBtnLoading(quickBtn, true);
       try {
         const data = await apiClient.request("/generate-quick", {
@@ -1225,11 +1222,15 @@ function addReplyButtonToMessage(message) {
             roomId,
             username,
             quickTemplate: template.id,
-            quickMessage
+            quickMessage: template.desc // Send desc as fallback context
           })
         });
 
-        latestReply = data.reply || quickMessage;
+        latestReply = data.reply;
+        if (!latestReply) {
+          throw new Error("No reply generated");
+        }
+
         await copyToClipboard(latestReply);
 
         if (settings.get('notifications')) {
@@ -1239,10 +1240,8 @@ function addReplyButtonToMessage(message) {
         setBtnLoading(quickBtn, false, "✅");
       } catch (err) {
         console.error("Quick generate error:", err);
-        // Fallback: just copy the template directly
-        await copyToClipboard(quickMessage);
-        showNotification(`Template copied: ${template.label}`, "success");
-        setBtnLoading(quickBtn, false, "✅");
+        showNotification(`Failed to generate: ${err.message}`, "error");
+        setBtnLoading(quickBtn, false, "❌");
       }
     });
 
@@ -1254,7 +1253,7 @@ function addReplyButtonToMessage(message) {
     quickDropdown.lastChild.style.borderBottom = "none";
   }
 
-  // Toggle dropdown on button click
+  // Toggle dropdown on button click with dynamic positioning
   quickBtn.onclick = (e) => {
     e.stopPropagation();
     const isVisible = quickDropdown.style.display === "block";
@@ -1264,18 +1263,47 @@ function addReplyButtonToMessage(message) {
       dd.style.display = "none";
     });
 
-    quickDropdown.style.display = isVisible ? "none" : "block";
+    if (!isVisible) {
+      // Calculate position based on button location
+      const btnRect = quickBtn.getBoundingClientRect();
+      const dropdownHeight = 350; // max-height
+      const viewportHeight = window.innerHeight;
+
+      // Check if dropdown would go below viewport
+      const spaceBelow = viewportHeight - btnRect.bottom;
+      const spaceAbove = btnRect.top;
+
+      if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+        // Show above the button
+        quickDropdown.style.top = "auto";
+        quickDropdown.style.bottom = (viewportHeight - btnRect.top + 4) + "px";
+      } else {
+        // Show below the button (default)
+        quickDropdown.style.top = (btnRect.bottom + 4) + "px";
+        quickDropdown.style.bottom = "auto";
+      }
+
+      quickDropdown.style.left = btnRect.left + "px";
+      quickDropdown.style.display = "block";
+    } else {
+      quickDropdown.style.display = "none";
+    }
   };
 
   // Close dropdown when clicking outside
   document.addEventListener('click', (e) => {
-    if (!quickContainer.contains(e.target)) {
+    if (!quickContainer.contains(e.target) && !quickDropdown.contains(e.target)) {
       quickDropdown.style.display = "none";
     }
   });
 
+  // Close dropdown on scroll
+  document.addEventListener('scroll', () => {
+    quickDropdown.style.display = "none";
+  }, true);
+
   quickContainer.appendChild(quickBtn);
-  quickContainer.appendChild(quickDropdown);
+  // Note: quickDropdown is appended to document.body above for proper z-index
 
   // Settings button removed - functionality moved to Analytics panel
 
