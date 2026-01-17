@@ -2,23 +2,23 @@ import { startSpinner, logOk, logErr, logWarn, COLORS } from "../../lib/logger.j
 import { sanitizeText, removeContractions } from "../../lib/helpers.js";
 import { generateReplyFromGrok } from "../../services/aiService.js";
 
-// Quick Chat Template configurations
+// Quick Chat Template configurations (Personal Conversation Starters)
 const QUICK_CHAT_PROMPTS = {
-   origin: "conversation starter asking where someone is from",
-   timezone: "conversation starter asking about timezone",
-   hobby: "conversation starter asking about hobbies and interests",
-   crypto_interest: "conversation starter asking how they got into crypto",
-   project_opinion: "conversation starter asking why they're interested in the project",
-   gm: "good morning greeting",
-   gn: "good night farewell",
-   welcome: "welcoming a new member",
-   favorite_chain: "conversation starter asking about favorite blockchain",
-   how_long: "conversation starter asking how long in crypto space",
-   plans: "conversation starter asking about future plans",
-   nft: "conversation starter asking about NFT interests",
-   experience: "conversation starter asking about their background",
-   alpha: "conversation starter asking about alpha or tips",
-   music: "conversation starter asking about music taste"
+   how_are_you: "ask how they are doing today",
+   how_long: "ask how long they have been in this community",
+   origin: "ask where they are from",
+   fav_food: "ask about favorite food from their place",
+   weather: "ask about weather or time at their place",
+   job: "ask what they do for work",
+   hobby: "ask about hobbies or favorite activities",
+   music: "ask about favorite music genre",
+   gaming: "ask what games they play",
+   coffee_tea: "ask if they prefer coffee or tea",
+   night_owl: "ask if they are night owl or early bird",
+   weekend: "ask about weekend plans or activities",
+   pet: "ask if they have pets",
+   travel: "ask about places they want to visit",
+   movie: "ask about favorite movies or series"
 };
 
 function registerQuickReplyRoute(app) {
@@ -39,52 +39,38 @@ function registerQuickReplyRoute(app) {
          let prompt;
 
          if (isQuickChat) {
-            // Quick Chat mode - context-aware conversation starter
+            // Quick Chat mode - ULTRA SHORT context-aware conversation starter
             const templateDesc = QUICK_CHAT_PROMPTS[quickTemplate] || "conversation starter";
-            const contextInfo = caption ? `\nCONTEXT FROM THEIR MESSAGE: "${sanitizeText(caption)}"` : "";
+            const contextInfo = caption ? `\nTheir message: "${sanitizeText(caption)}"` : "";
 
             prompt = `
-You are a friendly member of the "${roomId}" crypto community on Discord.
-
-TASK: Generate a CONTEXT-AWARE ${templateDesc} message to ${username || 'this user'}.
+You are chatting in "${roomId}" Discord. Generate a VERY SHORT ${templateDesc} to ${username || 'user'}.
 ${contextInfo}
 
-QUICK CHAT TYPE: ${quickTemplate}
-- origin: Ask where they're from, can relate to something they mentioned
-- timezone: Ask their timezone, maybe mention when you're active
-- hobby: Ask about hobbies/interests, connect to context if possible
-- crypto_interest: Ask how/why they got into crypto
-- project_opinion: Ask what interests them about this project
-- gm: Good morning greeting, can reference their recent activity
-- gn: Good night farewell
-- welcome: Welcome them if they seem new
-- favorite_chain: Ask about favorite blockchain
-- how_long: Ask how long they've been in crypto
-- plans: Ask about their plans/goals
-- nft: Ask about NFT interests
-- experience: Ask about their background (dev, trader, etc)
-- alpha: Ask if they have any alpha/tips to share
-- music: Ask about music taste
+TYPE: ${quickTemplate}
 
-IMPORTANT RULES:
-1. STRICTLY LOWERCASE only.
-2. MUST be context-aware - if they mentioned something, reference it naturally.
-3. Maximum 1-2 short sentences.
-4. Use casual internet slang: "u", "ur", "cuz", "tho", "kinda", "tbh".
-5. NO emojis, NO hashtags.
-6. Grammar should be slightly imperfect but readable.
-7. Make it sound like a real person typing, not a bot.
-8. Don't use contractions with apostrophe s (use "what is", "how is" instead of "what's", "how's").
-9. NO ending period.
-10. Don't just copy the template - make it CONTEXTUAL and NATURAL.
+CRITICAL RULES:
+1. MAXIMUM 5-8 WORDS ONLY. No more.
+2. lowercase only
+3. casual slang: u, ur, tho, btw
+4. NO emojis, NO period at end
+5. ONE simple question or greeting only
+6. Reference context briefly if relevant
 
-EXAMPLES OF CONTEXT-AWARE OUTPUT:
-- If they mentioned ETH and you're asking origin: "nice, ur into eth too, where u from btw"
-- If they said gm and you're asking timezone: "gm, what timezone u in, trying to catch u online"
-- If they're talking about a project: "this project looks cool, how did u first get into crypto"
-- If they seem excited: "love the energy, what got u interested in this project"
+GOOD EXAMPLES (copy this style):
+- "where u from btw"
+- "what timezone u in"
+- "how did u get into crypto"
+- "gm how is ur day"
+- "welcome to the fam"
+- "any alpha to share"
+- "what chain u prefer"
+- "how long u been here"
 
-OUTPUT: Return ONLY the message text, nothing else.
+BAD (too long, don't do this):
+- "ishikawa is cool, ur mum from there so what timezone u in, i am usually active evenings gmt"
+
+OUTPUT: Only the short message, nothing else.
 `.trim();
          } else {
             // Regular quick reply mode

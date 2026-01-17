@@ -1122,23 +1122,23 @@ function addReplyButtonToMessage(message) {
     }
   };
 
-  // ===== Quick Chat Templates (Context-Aware) =====
+  // ===== Quick Chat Templates (Personal Conversation Starters) =====
   const QUICK_CHAT_TEMPLATES = [
-    { id: 'origin', label: '🌍 Ask Origin', desc: "Ask where they're from based on context" },
-    { id: 'timezone', label: '🕐 Ask Timezone', desc: "Ask their timezone naturally" },
-    { id: 'hobby', label: '🎮 Ask Hobby', desc: "Ask about hobbies/interests" },
-    { id: 'crypto_interest', label: '💰 Crypto Interest', desc: "Ask how they got into crypto" },
-    { id: 'project_opinion', label: '📊 Project Opinion', desc: "Ask why they like this project" },
-    { id: 'gm', label: '☀️ Good Morning', desc: "Context-aware GM greeting" },
-    { id: 'gn', label: '🌙 Good Night', desc: "Context-aware GN farewell" },
-    { id: 'welcome', label: '👋 Welcome', desc: "Welcome them to community" },
-    { id: 'favorite_chain', label: '⛓️ Favorite Chain', desc: "Ask about favorite blockchain" },
-    { id: 'how_long', label: '📅 How Long Here', desc: "Ask how long in crypto space" },
-    { id: 'plans', label: '🚀 Future Plans', desc: "Ask about their goals/plans" },
-    { id: 'nft', label: '🖼️ NFT Interest', desc: "Ask about NFT interests" },
-    { id: 'experience', label: '💼 Experience', desc: "Ask about their background" },
-    { id: 'alpha', label: '🔥 Alpha Hunter', desc: "Ask for alpha/tips" },
-    { id: 'music', label: '🎵 Music Taste', desc: "Ask about music preferences" }
+    { id: 'how_are_you', label: '👋 Tanya Kabar', desc: "Tanya gimana kabarnya hari ini" },
+    { id: 'how_long', label: '📅 Berapa Lama Disini', desc: "Tanya sudah berapa lama di komunitas" },
+    { id: 'origin', label: '🌍 Dari Mana', desc: "Tanya dia dari mana asalnya" },
+    { id: 'fav_food', label: '🍜 Makanan Favorit', desc: "Tanya makanan favorit dari tempatnya" },
+    { id: 'weather', label: '🌤️ Cuaca Disana', desc: "Tanya cuaca atau waktu di tempatnya" },
+    { id: 'job', label: '💼 Kerjaan', desc: "Tanya kerja apa atau background-nya" },
+    { id: 'hobby', label: '🎮 Hobi', desc: "Tanya hobi atau kegiatan favorit" },
+    { id: 'music', label: '🎵 Musik', desc: "Tanya genre musik favorit" },
+    { id: 'gaming', label: '🕹️ Gaming', desc: "Tanya main game apa" },
+    { id: 'coffee_tea', label: '☕ Kopi atau Teh', desc: "Tanya lebih suka kopi atau teh" },
+    { id: 'night_owl', label: '🦉 Night Owl', desc: "Tanya tipe begadang atau bangun pagi" },
+    { id: 'weekend', label: '🏖️ Weekend', desc: "Tanya rencana weekend atau aktivitas" },
+    { id: 'pet', label: '🐱 Peliharaan', desc: "Tanya punya hewan peliharaan tidak" },
+    { id: 'travel', label: '✈️ Travel', desc: "Tanya tempat yg ingin dikunjungi" },
+    { id: 'movie', label: '🎬 Film/Series', desc: "Tanya film atau series favorit" }
   ];
 
   // ===== Quick Actions with Dropdown =====
@@ -1215,8 +1215,10 @@ function addReplyButtonToMessage(message) {
 
       setBtnLoading(quickBtn, true);
       try {
-        const data = await apiClient.request("/generate-quick", {
+        // Use direct fetch with CONFIG.API_BASE_URL (updated after project.json load)
+        const response = await fetch(`${CONFIG.API_BASE_URL}/generate-quick`, {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             caption,
             roomId,
@@ -1225,6 +1227,12 @@ function addReplyButtonToMessage(message) {
             quickMessage: template.desc // Send desc as fallback context
           })
         });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || `HTTP ${response.status}`);
+        }
 
         latestReply = data.reply;
         if (!latestReply) {
@@ -1297,10 +1305,12 @@ function addReplyButtonToMessage(message) {
     }
   });
 
-  // Close dropdown on scroll
-  document.addEventListener('scroll', () => {
-    quickDropdown.style.display = "none";
-  }, true);
+  // Close dropdown on Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      quickDropdown.style.display = "none";
+    }
+  });
 
   quickContainer.appendChild(quickBtn);
   // Note: quickDropdown is appended to document.body above for proper z-index
