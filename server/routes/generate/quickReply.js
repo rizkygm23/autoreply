@@ -57,7 +57,7 @@ CRITICAL RULES:
 5. ONE simple question or greeting only
 6. Reference context briefly if relevant
 
-GOOD EXAMPLES (copy this style):
+GOOD EXAMPLES (copy this style, don't copy the sentence):
 - "where u from btw"
 - "what timezone u in"
 - "how did u get into crypto"
