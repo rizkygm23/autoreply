@@ -27,7 +27,7 @@ const TEMPLATE_EXAMPLES = {
       0: ["- \"yo whats good\"", "- \"wssup broo\"", "- \"how u doin man\""],
       1: ["- \"yo everything good?\"", "- \"sup u busy?\"", "- \"yo what u up to\""],
       2: ["- \"chillin or workin?\"", "- \"yo hows life\"", "- \"yo day goin aight?\""],
-      3: ["- \"sup good day so far?\"", "- \"yo vibes check\"", "- \"u good bro?\""],
+      3: ["- \"sup good day so far?\"", "- \"yo mood check\"", "- \"u good bro?\""],
       4: ["- \"mood rn?\"", "- \"yo u been energetic?\"", "- \"feelin tired or nah?\""],
       5: ["- \"u sleepin good?\"", "- \"yo energy check\"", "- \"sup random check\""],
       6: ["- \"yo you alive?\"", "- \"sup ghost\"", "- \"everything solid?\""],
@@ -51,7 +51,7 @@ const TEMPLATE_EXAMPLES = {
       0: ["- \"aight where u from\"", "- \"yo u local?\"", "- \"where u based bro\""],
       1: ["- \"what timezone u in\"", "- \"u from states?\"", "- \"yo country check\""],
       2: ["- \"u asian or nah?\"", "- \"where u livin rn\"", "- \"sup u western?\""],
-      3: ["- \"yo hometown vibes?\"", "- \"u movin or stayin?\"", "- \"born there?\""],
+      3: ["- \"yo hometown feels?\"", "- \"u movin or stayin?\"", "- \"born there?\""],
       4: ["- \"yo city or village?\"", "- \"busy city life?\"", "- \"quiet place?\""],
       5: ["- \"yo u near sea?\"", "- \"inland or coast?\"", "- \"where exactly bro\""],
       6: ["- \"north or south?\"", "- \"east or west side?\"", "- \"reppin where?\""],
@@ -76,7 +76,7 @@ const TEMPLATE_EXAMPLES = {
       1: ["- \"yo hot or cold\"", "- \"freezing rn?\"", "- \"sweating bullets?\""],
       2: ["- \"snowing maybe?\"", "- \"stormy skies?\"", "- \"windy af?\""],
       3: ["- \"yo night or day\"", "- \"sun up yet?\"", "- \"pitch black?\""],
-      4: ["- \"perfect weather?\"", "- \"picnic vibes?\"", "- \"stay inside weather\""],
+      4: ["- \"perfect weather?\"", "- \"picnic weather?\"", "- \"stay inside weather\""],
       5: ["- \"yo humidity check\"", "- \"dry or humid\"", "- \"aircon season?\""],
       6: ["- \"yo fog city?\"", "- \"clear skies?\"", "- \"star gazing?\""],
       7: ["- \"yo winter coat?\"", "- \"shorts weather?\"", "- \"hoodie season?\""],
@@ -160,7 +160,7 @@ const TEMPLATE_EXAMPLES = {
       1: ["- \"yo party time?\"", "- \"relax mode?\"", "- \"sleep in\""],
       2: ["- \"yo adventures?\"", "- \"trip planned?\"", "- \"staycaction\""],
       3: ["- \"yo chores day?\"", "- \"cleaning up?\"", "- \"laundry day\""],
-      4: ["- \"yo family time?\"", "- \"friends hangout\"", "- \"solo vibes\""],
+      4: ["- \"yo family time?\"", "- \"friends hangout\"", "- \"solo chillin\""],
       5: ["- \"yo sunday scaries\"", "- \"monday blues\"", "- \"weekend over\""],
       6: ["- \"yo binge watch?\"", "- \"movie marathon\"", "- \"series catchup\""],
       7: ["- \"yo shopping?\"", "- \"money spending\"", "- \"saving mode\""],
@@ -170,7 +170,7 @@ const TEMPLATE_EXAMPLES = {
    pet: {
       0: ["- \"yo got pets?\"", "- \"animal lover?\"", "- \"dog or cat\""],
       1: ["- \"yo dog person?\"", "- \"puppy luv\"", "- \"big dogs\""],
-      2: ["- \"yo cat person?\"", "- \"kitten vibes\"", "- \"crazy cat guy\""],
+      2: ["- \"yo cat person?\"", "- \"kitten lover\"", "- \"crazy cat guy\""],
       3: ["- \"yo exotic pets?\"", "- \"snake?\"", "- \"lizard?\""],
       4: ["- \"yo bird watcher\"", "- \"parrot?\"", "- \"noise maker\""],
       5: ["- \"yo fish tank?\"", "- \"aquarium?\"", "- \"nemo?\""],
@@ -249,7 +249,7 @@ const REPLY_EXAMPLES = {
       "- \"thats actually wild\""
    ],
    7: [
-      "- \"vibes are immaculate\"",
+      "- \"energy is crazy\"",
       "- \"chill energy only\"",
       "- \"mood rn tbh\"",
       "- \"same energy bro\""
@@ -317,6 +317,8 @@ CRITICAL RULES:
 6. DO NOT add random stuff like "pushing through" or describe what they're doing
 7. DO NOT repeat common phrases - be creative and unique each time
 8. STAY ON TOPIC - only ask what TYPE says, nothing extra
+9. DO NOT use the words "vibing", "vibe", "vibes"
+
 
 GOOD EXAMPLES (super casual bro style):
 ${examples}
@@ -359,6 +361,8 @@ CRITICAL RULES:
 6. ONLY respond to what they said - do NOT add random stuff
 7. DO NOT describe activities like "pushing through" or "staying productive"
 8. DO NOT make up context that wasn't in their message
+9. DO NOT use the words "vibing", "vibe", "vibes"
+
 
 GOOD EXAMPLES (casual bro style):
 ${examples}
