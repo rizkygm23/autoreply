@@ -7,21 +7,21 @@ import { generateReplyFromGrok } from "../../services/aiService.js";
 // 0-9 Time-based variations for Twitter Replies
 const TWITTER_REPLY_EXAMPLES = {
   0: [
-    "- \"yo thats sick\"",
-    "- \"real, same here bro\"",
-    "- \"ngl that sounds rough\"",
+    "- \"thats sick\"",
+    "- \"real, same here\"",
+    "- \"ngl sounds bad\"",
     "- \"aight makes sense\""
   ],
   1: [
     "- \"wait fr?\"",
-    "- \"yo nice one\"",
+    "- \"nice one man\"",
     "- \"lmao true tho\"",
     "- \"no way fr\""
   ],
   2: [
     "- \"damn thats tough\"",
-    "- \"sheesh wild\"",
-    "- \"yo thats crazy\"",
+    "- \"thats wild\"",
+    "- \"thats crazy\"",
     "- \"fr? didnt know that\""
   ],
   3: [
@@ -37,10 +37,10 @@ const TWITTER_REPLY_EXAMPLES = {
     "- \"typical fr\""
   ],
   5: [
-    "- \"yo congrats man\"",
-    "- \"huge W bro\"",
+    "- \"congrats man\"",
+    "- \"big win bro\"",
     "- \"big moves only\"",
-    "- \"keep grinding man\""
+    "- \"keep working hard\""
   ],
   6: [
     "- \"wait what?\"",
@@ -55,7 +55,7 @@ const TWITTER_REPLY_EXAMPLES = {
     "- \"same energy bro\""
   ],
   8: [
-    "- \"yo explain pls\"",
+    "- \"explain pls\"",
     "- \"wait how so?\"",
     "- \"u sure about that?\"",
     "- \"curious why tho\""
@@ -114,13 +114,15 @@ New tweet: "${caption}"
 CRITICAL RULES:
 1. MAXIMUM 5-8 WORDS ONLY. Super short.
 2. lowercase only, casual bro vibes
-3. slang: u, ur, tho, btw, rn, ngl, tbh, yo, broo
-4. NO emojis, NO period at end
-5. ONE simple response only
-6. ONLY respond to what they said - do NOT add random stuff
-7. DO NOT describe activities like "pushing through" or "staying productive"
-8. DO NOT make up context that wasn't in their message
-9. DO NOT use the words "vibing", "vibe", "vibes"
+3. slang: u, ur, tho, btw, rn, ngl, tbh, bro, fr
+4. AVOID starting with "yo" every time. Use variety.
+5. NO emojis, NO period at end
+6. ONE simple response only
+7. ONLY respond to what they said - do NOT add random stuff
+8. DO NOT describe activities like "pushing through" or "staying productive"
+9. DO NOT make up context that wasn't in their message
+10. USE SIMPLE ENGLISH. No idioms like "holding up", "rollin". Keep it basic.
+11. DO NOT use the words "vibing", "vibe", "vibes"
 
 GOOD EXAMPLES (casual bro style):
 ${examples}

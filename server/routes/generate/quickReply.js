@@ -24,25 +24,25 @@ const QUICK_CHAT_PROMPTS = {
 // Variations of examples based on second (0-9) to ensure variety
 const TEMPLATE_EXAMPLES = {
    how_are_you: {
-      0: ["- \"whats good\"", "- \"wssup bro\"", "- \"how u doin\""],
+      0: ["- \"whats good\"", "- \"whats up bro\"", "- \"how u doin\""],
       1: ["- \"everything good?\"", "- \"sup u busy?\"", "- \"what u up to\""],
-      2: ["- \"chillin or workin?\"", "- \"hows life\"", "- \"day goin aight?\""],
+      2: ["- \"relaxing or working?\"", "- \"hows life\"", "- \"day goin good?\""],
       3: ["- \"good day so far?\"", "- \"mood check\"", "- \"u good bro?\""],
       4: ["- \"mood rn?\"", "- \"u energetic?\"", "- \"tired or nah?\""],
       5: ["- \"u sleepin good?\"", "- \"energy check\"", "- \"sup random check\""],
-      6: ["- \"you alive?\"", "- \"sup ghost\"", "- \"everything solid?\""],
-      7: ["- \"hows the mental\"", "- \"stress levels?\"", "- \"chillin?\""],
+      6: ["- \"you alive?\"", "- \"long time no see\"", "- \"everything solid?\""],
+      7: ["- \"hows the mental\"", "- \"stress levels?\"", "- \"relaxing?\""],
       8: ["- \"whats new bro\"", "- \"anything exciting\"", "- \"same old?\""],
-      9: ["- \"happy today?\"", "- \"u straight?\"", "- \"mood check\""]
+      9: ["- \"happy today?\"", "- \"u good?\"", "- \"mood check\""]
    },
    how_long: {
       0: ["- \"u been here long?\"", "- \"when d'u join\"", "- \"u new here?\""],
-      1: ["- \"og or new?\"", "- \"how long u chillin here\"", "- \"u join recently?\""],
+      1: ["- \"old or new?\"", "- \"how long u been here\"", "- \"u join recently?\""],
       2: ["- \"whats ur join date\"", "- \"been active long?\"", "- \"seen u before?\""],
-      3: ["- \"u know ppl here?\"", "- \"veteran or rookie\"", "- \"time flies huh\""],
-      4: ["- \"here since start?\"", "- \"joined when?\"", "- \"fresh or vintage?\""],
+      3: ["- \"u know ppl here?\"", "- \"new or old member\"", "- \"time flies huh\""],
+      4: ["- \"here since start?\"", "- \"joined when?\"", "- \"new or classic?\""],
       5: ["- \"first time here?\"", "- \"long time member?\"", "- \"sup new guy\""],
-      6: ["- \"been here mostly?\"", "- \"lurk or chat?\"", "- \"history check\""],
+      6: ["- \"been here mostly?\"", "- \"read or chat?\"", "- \"history check\""],
       7: ["- \"remember old days?\"", "- \"verified long?\"", "- \"member since 202?\""],
       8: ["- \"how many months\"", "- \"years or months?\"", "- \"quick stat check\""],
       9: ["- \"forever member?\"", "- \"stayin long?\"", "- \"plan to stay?\""]
@@ -56,40 +56,40 @@ const TEMPLATE_EXAMPLES = {
       5: ["- \"u near sea?\"", "- \"inland or coast?\"", "- \"where exactly\""],
       6: ["- \"north or south?\"", "- \"east or west side?\"", "- \"reppin where?\""],
       7: ["- \"u speak lang?\"", "- \"native there?\"", "- \"accent check\""],
-      8: ["- \"hot or cold there\"", "- \"weather dependent?\"", "- \"place nice?\""],
+      8: ["- \"hot or cold there\"", "- \"weather good?\"", "- \"place nice?\""],
       9: ["- \"dream place?\"", "- \"u like it there?\"", "- \"movin soon?\""]
    },
    fav_food: {
-      0: ["- \"starving rn\"", "- \"fav food go\"", "- \"u eat yet?\""],
+      0: ["- \"hungry rn\"", "- \"fav food go\"", "- \"u eat yet?\""],
       1: ["- \"pizza or burger\"", "- \"sweet or salty?\"", "- \"best dish there?\""],
       2: ["- \"u cook?\"", "- \"chef or takeout?\"", "- \"fav cuisine\""],
       3: ["- \"spicy food fan?\"", "- \"sushi guy?\"", "- \"meat or veg?\""],
-      4: ["- \"dessert guy?\"", "- \"snack addict?\"", "- \"late night munchies\""],
+      4: ["- \"dessert guy?\"", "- \"snack addict?\"", "- \"night snack?\""],
       5: ["- \"breakfast person?\"", "- \"coffee or food first\"", "- \"fav restaurant?\""],
       6: ["- \"homecooked best?\"", "- \"moms cooking?\"", "- \"fancy dining?\""],
-      7: ["- \"exotic food?\"", "- \"try anything weird?\"", "- \"food adventurous?\""],
+      7: ["- \"exotic food?\"", "- \"try new food?\"", "- \"food adventurous?\""],
       8: ["- \"fruit or junk\"", "- \"healthy eater?\"", "- \"gym diet?\""],
       9: ["- \"comfort food\"", "- \"sad meal?\"", "- \"happy meal?\""]
    },
    weather: {
       0: ["- \"sunny there?\"", "- \"raining rn?\"", "- \"weather check\""],
-      1: ["- \"hot or cold\"", "- \"freezing rn?\"", "- \"sweating bullets?\""],
+      1: ["- \"hot or cold\"", "- \"freezing rn?\"", "- \"really hot?\""],
       2: ["- \"snowing maybe?\"", "- \"stormy skies?\"", "- \"windy af?\""],
-      3: ["- \"night or day\"", "- \"sun up yet?\"", "- \"pitch black?\""],
+      3: ["- \"night or day\"", "- \"sun up yet?\"", "- \"dark outside?\""],
       4: ["- \"perfect weather?\"", "- \"picnic weather?\"", "- \"stay inside weather\""],
       5: ["- \"humidity check\"", "- \"dry or humid\"", "- \"aircon season?\""],
       6: ["- \"fog city?\"", "- \"clear skies?\"", "- \"star gazing?\""],
       7: ["- \"winter coat?\"", "- \"shorts weather?\"", "- \"hoodie season?\""],
       8: ["- \"climate change?\"", "- \"weird weather?\"", "- \"normal day?\""],
-      9: ["- \"forecast good?\"", "- \"expect rain?\"", "- \"umbrella need?\""]
+      9: ["- \"forecast good?\"", "- \"expect rain?\"", "- \"to rain or no?\""]
    },
    job: {
       0: ["- \"what u workin on\"", "- \"u work or study?\"", "- \"job title bro\""],
       1: ["- \"tech guy?\"", "- \"creative field?\"", "- \"manual labor?\""],
       2: ["- \"u student still?\"", "- \"uni or hs?\"", "- \"graduated yet?\""],
-      3: ["- \"remote work?\"", "- \"office slave?\"", "- \"freelancer?\""],
+      3: ["- \"remote work?\"", "- \"office worker?\"", "- \"freelancer?\""],
       4: ["- \"dream job?\"", "- \"hate ur job?\"", "- \"love work?\""],
-      5: ["- \"hustle mode?\"", "- \"grinding rn?\"", "- \"chillin at work\""],
+      5: ["- \"working hard?\"", "- \"busy rn?\"", "- \"chillin at work\""],
       6: ["- \"boss man?\"", "- \"employee life?\"", "- \"startup guy?\""],
       7: ["- \"tech stack?\"", "- \"coding wizard?\"", "- \"sales guy?\""],
       8: ["- \"artist?\"", "- \"musician?\"", "- \"engineer?\""],
@@ -98,37 +98,37 @@ const TEMPLATE_EXAMPLES = {
    hobby: {
       0: ["- \"free time stuff\"", "- \"hobbies bro?\"", "- \"what u do 4 fun\""],
       1: ["- \"creative type?\"", "- \"draw or paint?\"", "- \"write stuff?\""],
-      2: ["- \"sport guy?\"", "- \"gym rat?\"", "- \"couch potato?\""],
-      3: ["- \"collector?\"", "- \"collect what?\"", "- \"hoarder lol\""],
+      2: ["- \"sport guy?\"", "- \"gym rat?\"", "- \"lazy day?\""],
+      3: ["- \"collector?\"", "- \"collect what?\"", "- \"collection check\""],
       4: ["- \"reading?\"", "- \"book worm?\"", "- \"kindle guy?\""],
       5: ["- \"travel bug?\"", "- \"hiking?\"", "- \"nature guy?\""],
       6: ["- \"coding 4 fun\"", "- \"side projects?\"", "- \"hacker man?\""],
-      7: ["- \"car guy?\"", "- \"motorhead?\"", "- \"speed demon\""],
+      7: ["- \"car guy?\"", "- \"motorhead?\"", "- \"fast cars?\""],
       8: ["- \"diy guy?\"", "- \"fix stuff?\"", "- \"builder?\""],
-      9: ["- \"learnin smth?\"", "- \"new skill?\"", "- \"curious mind\""]
+      9: ["- \"learnin smth?\"", "- \"new skill?\"", "- \"curious type\""]
    },
    music: {
-      0: ["- \"what u bumpin\"", "- \"music taste check\"", "- \"spotify wrapped?\""],
+      0: ["- \"what u listening to\"", "- \"music taste check\"", "- \"spotify wrapped?\""],
       1: ["- \"rap or pop\"", "- \"rock fan?\"", "- \"edm head?\""],
       2: ["- \"old school?\"", "- \"modern hits?\"", "- \"throwbacks?\""],
       3: ["- \"sad songs?\"", "- \"hype tracks?\"", "- \"chill lofi?\""],
       4: ["- \"fav artist\"", "- \"concert goer?\"", "- \"live music?\""],
       5: ["- \"play instrument\"", "- \"guitar hero?\"", "- \"piano man?\""],
       6: ["- \"producer?\"", "- \"make beats?\"", "- \"dj guy?\""],
-      7: ["- \"kpop?\"", "- \"anime ost?\"", "- \"movie scores?\""],
+      7: ["- \"kpop?\"", "- \"anime song?\"", "- \"movie scores?\""],
       8: ["- \"vinyl guy?\"", "- \"audiophile?\"", "- \"headphones on?\""],
       9: ["- \"sing?\"", "- \"karaoke god?\"", "- \"shower singer\""]
    },
    gaming: {
       0: ["- \"what u playin\"", "- \"gamer check\"", "- \"console or pc\""],
-      1: ["- \"fps god?\"", "- \"rpg grinder?\"", "- \"mmo addict?\""],
+      1: ["- \"fps god?\"", "- \"rpg fan?\"", "- \"mmo addict?\""],
       2: ["- \"league player?\"", "- \"valorant?\"", "- \"csgo?\""],
-      3: ["- \"casual mobile?\"", "- \"sweaty gamer?\"", "- \"chill games\""],
+      3: ["- \"casual mobile?\"", "- \"serious gamer?\"", "- \"chill games\""],
       4: ["- \"singleplayer?\"", "- \"story mode?\"", "- \"online only\""],
       5: ["- \"retro games?\"", "- \"emulator?\"", "- \"nostalgia?\""],
       6: ["- \"indie gems?\"", "- \"triple a only?\"", "- \"hidden finds\""],
       7: ["- \"esports fan?\"", "- \"watch twitch?\"", "- \"streamer?\""],
-      8: ["- \"rage quit?\"", "- \"tilt proof?\"", "- \"toxic lol\""],
+      8: ["- \"rage quit?\"", "- \"never angry?\"", "- \"toxic lol\""],
       9: ["- \"waiting 4 gta6\"", "- \"hype train?\"", "- \"new releases\""]
    },
    coffee_tea: {
@@ -145,10 +145,10 @@ const TEMPLATE_EXAMPLES = {
    },
    night_owl: {
       0: ["- \"sleep schedule\"", "- \"tired rn?\"", "- \"wide awake\""],
-      1: ["- \"night owl?\"", "- \"vampire mode?\"", "- \"no sleep\""],
+      1: ["- \"night owl?\"", "- \"stay up late?\"", "- \"no sleep\""],
       2: ["- \"early bird?\"", "- \"morning person\"", "- \"sunrise gang\""],
-      3: ["- \"napper?\"", "- \"siesta time?\"", "- \"power nap\""],
-      4: ["- \"3am thoughts\"", "- \"midnite snack\"", "- \"quiet hours\""],
+      3: ["- \"napper?\"", "- \"nap time?\"", "- \"power nap\""],
+      4: ["- \"3am thoughts\"", "- \"midnight snack\"", "- \"quiet hours\""],
       5: ["- \"work at nite\"", "- \"night shift?\"", "- \"day shift\""],
       6: ["- \"party all nite\"", "- \"clubbing?\"", "- \"stayin in\""],
       7: ["- \"insomnia?\"", "- \"cant sleep?\"", "- \"counting sheep\""],
@@ -187,7 +187,7 @@ const TEMPLATE_EXAMPLES = {
       4: ["- \"solo travel\"", "- \"group tour\"", "- \"family trip\""],
       5: ["- \"backpacker?\"", "- \"luxury hotel\"", "- \"hostel life\""],
       6: ["- \"bucket list\"", "- \"dream spot\"", "- \"must visit\""],
-      7: ["- \"language issue\"", "- \"lost in translation\"", "- \"google translate\""],
+      7: ["- \"language issue\"", "- \"lost translation\"", "- \"google translate\""],
       8: ["- \"food tourism\"", "- \"eat pray love\"", "- \"tasting menu\""],
       9: ["- \"homesick?\"", "- \"miss home?\"", "- \"never return\""]
    },
@@ -318,7 +318,8 @@ CRITICAL RULES:
 7. DO NOT add random stuff like "pushing through" or describe what they're doing
 8. DO NOT repeat common phrases - be creative and unique each time
 9. STAY ON TOPIC - only ask what TYPE says, nothing extra
-10. DO NOT use the words "vibing", "vibe", "vibes"
+10. USE SIMPLE ENGLISH. No idioms like "holding up", "rollin". Keep it basic.
+11. DO NOT use the words "vibing", "vibe", "vibes"
 
 
 GOOD EXAMPLES (super casual bro style):
@@ -363,7 +364,8 @@ CRITICAL RULES:
 7. ONLY respond to what they said - do NOT add random stuff
 8. DO NOT describe activities like "pushing through" or "staying productive"
 9. DO NOT make up context that wasn't in their message
-10. DO NOT use the words "vibing", "vibe", "vibes"
+10. USE SIMPLE ENGLISH. No idioms like "holding up", "rollin". Keep it basic.
+11. DO NOT use the words "vibing", "vibe", "vibes"
 
 
 GOOD EXAMPLES (casual bro style):
