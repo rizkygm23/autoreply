@@ -115,7 +115,7 @@ function registerDiscordReplyRoute(app) {
        - If mode: quote_tweet: (General/Meme): Max 2 sentences (punchy/witty).
        - If mode: quote_tweet: (Project Analysis/Deep Tech): Max 5 sentences allowed.
          * RULE: Only use 4-5 sentences if explaining a complex flaw (FDV/Tech) or summarizing a deep article. Don't yap unnecessarily.
-    3. No emojis, no hashtags, no bullet points.
+    3. No hashtags, no bullet points. Standard Unicode emojis are BANNED (e.g. 🔥). Custom server emojis are ALLOWED ONLY if listed in "Specific Rules" below.
     4. AVOID FILLERS: "ngl", "fr", "it seems", "looks like", "i think". (Note: "lol/lmao" is allowed ONLY if necessary).
     
     5. AGREEMENT RULES: 
