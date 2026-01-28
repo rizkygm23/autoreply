@@ -1,6 +1,14 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { startSpinner, logOk, logErr, logWarn, COLORS } from "../../lib/logger.js";
 import { sanitizeText, removeContractions } from "../../lib/helpers.js";
 import { generateReplyFromGrok } from "../../services/aiService.js";
+import { loadJSON } from "../../lib/storage.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_JSON_PATH = path.resolve(__dirname, "../../../project.json");
 
 // Quick Chat Template configurations (Personal Conversation Starters)
 const QUICK_CHAT_PROMPTS = {
@@ -280,9 +288,27 @@ function registerQuickReplyRoute(app) {
          return res.status(400).json({ error: "roomId is required" });
       }
 
+
       const spinner = startSpinner(`${req._id} /generate-quick${isQuickChat ? ` (${quickTemplate})` : ""}`, "AI thinking");
 
       try {
+         // Load project settings to get room emojis
+         let roomEmojis = [];
+         try {
+            const projectConfig = loadJSON(PROJECT_JSON_PATH);
+            const roomConfig = projectConfig?.rooms?.find(r => r.id === roomId);
+            if (roomConfig && roomConfig.emojis && roomConfig.emojis.length > 0) {
+               roomEmojis = roomConfig.emojis;
+            }
+         } catch (err) {
+            console.warn("Failed to load project.json for emojis", err);
+         }
+
+         const hasCustomEmojis = roomEmojis.length > 0;
+         const emojiInstructions = hasCustomEmojis
+            ? `12. CUSTOM EMOJIS ALLOWED: You MAY use one of these specific emojis at the end: ${roomEmojis.join(", ")}. Do NOT use standard standard unicode emojis.`
+            : "12. EXPANDED NO EMOJIS: Absolutely NO emojis of any kind.";
+
          let prompt;
 
          if (isQuickChat) {
@@ -313,13 +339,14 @@ CRITICAL RULES:
 2. lowercase only, very casual bro vibes
 3. slang style: u, ur, tho, btw, sup, bro, rn, fr
 4. AVOID starting with "yo" every time. Use variety.
-5. NO emojis, NO period at end
+5. NO standard emojis (like 😂, 🔥) or periods at end.
 6. ONE simple question only - just the question, nothing else
 7. DO NOT add random stuff like "pushing through" or describe what they're doing
 8. DO NOT repeat common phrases - be creative and unique each time
 9. STAY ON TOPIC - only ask what TYPE says, nothing extra
 10. USE SIMPLE ENGLISH. Avoid complex idioms.
-11. BLACKLIST (DO NOT USE): vibing, vibe, vibes, holding up, rollin, grinding, hustle, sheesh, finna, boutta, cap, no cap, bet, cooked
+11. BLACKLIST (DO NOT USE): vibing, vibe, holding up, holdin, how u holdin, rollin, grinding, hustle, sheesh, finna, boutta, cap, no cap, bet, cooked
+${emojiInstructions}
 
 
 GOOD EXAMPLES (super casual bro style):
@@ -359,13 +386,14 @@ CRITICAL RULES:
 2. lowercase only, casual bro vibes
 3. slang: u, ur, tho, btw, rn, ngl, tbh, bro, fr
 4. AVOID starting with "yo" every time. Use variety.
-5. NO emojis, NO period at end
+5. NO standard emojis (like 😂, 🔥) or periods at end.
 6. ONE simple response only
 7. ONLY respond to what they said - do NOT add random stuff
 8. DO NOT describe activities like "pushing through" or "staying productive"
 9. DO NOT make up context that wasn't in their message
 10. USE SIMPLE ENGLISH. Avoid complex idioms.
-11. BLACKLIST (DO NOT USE): vibing, vibe, vibes, holding up, rollin, grinding, hustle, sheesh, finna, boutta, cap, no cap, bet, cooked
+11. BLACKLIST (DO NOT USE): vibing, vibe, holding up, holdin, how u holdin, rollin, grinding, hustle, sheesh, finna, boutta, cap, no cap, bet, cooked
+${emojiInstructions}
 
 
 GOOD EXAMPLES (casual bro style):
