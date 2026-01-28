@@ -311,7 +311,7 @@ ${roomEmojis.length > 0 ? `- EMOJI USAGE (OCCASIONAL - 20-30% of replies):
   * PLACEMENT: Emoji MUST be placed at the END of the sentence only, never at the start or middle
   * FREQUENCY: Most replies should be text-only. Only add emoji when it genuinely enhances the message
   * USE emoji for: celebrations, hype moments, strong reactions, playful banter
-  * SKIP emoji for: normal conversation, questions, casual responses, generic replies
+ 
   * Maximum 1 emoji per reply, always at the very end
   * Default behavior: NO emoji. Only add if it feels extra fitting` : '- No custom emojis available for this server'}
 ${roomExtraInfo ? `- ROOM-SPECIFIC INFO: ${roomExtraInfo}` : ''}
