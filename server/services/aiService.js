@@ -67,23 +67,23 @@ async function generateReplyFromGrok(prompt) {
     // Log token usage and cost estimation
     const usage = completion.usage;
     if (usage) {
-      // xAI grok-3-fast pricing: $0.2/1M input, $0.5/1M output
-      const INPUT_COST_PER_TOKEN = 0.2 / 1_000_000;  // $0.0000002
-      const OUTPUT_COST_PER_TOKEN = 0.5 / 1_000_000; // $0.0000005
+      // Pricing per 1M tokens: $0.20 input, $0.05 cached input, $0.50 output
+      const INPUT_COST = 0.20 / 1_000_000;
+      const CACHED_INPUT_COST = 0.05 / 1_000_000;
+      const OUTPUT_COST = 0.50 / 1_000_000;
 
-      const inputCost = usage.prompt_tokens * INPUT_COST_PER_TOKEN;
-      const outputCost = usage.completion_tokens * OUTPUT_COST_PER_TOKEN;
+      let inputCost = 0;
+      const outputCost = usage.completion_tokens * OUTPUT_COST;
+
+      // Handle cached tokens if reported (OpenAI format)
+      const cachedTokens = usage.prompt_tokens_details?.cached_tokens || 0;
+      const regularInputTokens = usage.prompt_tokens - cachedTokens;
+
+      inputCost = (regularInputTokens * INPUT_COST) + (cachedTokens * CACHED_INPUT_COST);
       const totalCost = inputCost + outputCost;
 
-      // Format cost to show in micro-dollars for readability
-      const formatCost = (cost) => {
-        if (cost < 0.0001) return `$${(cost * 1000000).toFixed(2)}µ`; // micro-dollars
-        if (cost < 0.01) return `$${(cost * 1000).toFixed(3)}m`; // milli-dollars
-        return `$${cost.toFixed(6)}`;
-      };
-
-      console.log(`[Grok] 📊 Tokens: \x1b[36min:${usage.prompt_tokens}\x1b[0m | \x1b[32mout:${usage.completion_tokens}\x1b[0m | \x1b[33mtotal:${usage.total_tokens}\x1b[0m`);
-      console.log(`[Grok] 💰 Cost: \x1b[36min:${formatCost(inputCost)}\x1b[0m | \x1b[32mout:${formatCost(outputCost)}\x1b[0m | \x1b[33mtotal:${formatCost(totalCost)}\x1b[0m`);
+      console.log(`[Grok] 📊 Tokens: \x1b[36min:${regularInputTokens}${cachedTokens ? `+${cachedTokens}(cache)` : ''}\x1b[0m | \x1b[32mout:${usage.completion_tokens}\x1b[0m | \x1b[33mtotal:${usage.total_tokens}\x1b[0m`);
+      console.log(`[Grok] 💰 Cost: \x1b[36min:$${inputCost.toFixed(9)}\x1b[0m | \x1b[32mout:$${outputCost.toFixed(9)}\x1b[0m | \x1b[33mtotal:$${totalCost.toFixed(9)}\x1b[0m`);
     }
 
     return {
