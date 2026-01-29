@@ -22,6 +22,7 @@ const CONFIG = {
 // Project data loaded from project.json
 let projectData = null;
 let roomInfoMap = {};
+let sessionGenerateCount = 0;
 
 // Embedded fallback data
 const FALLBACK_PROJECT_DATA = {
@@ -740,6 +741,18 @@ function extractMessagePieces(messageEl) {
 // === Global Room Selector for Discord (Fixed Position)
 let globalRoomSelector = null;
 
+function updateCounterUI() {
+  const el = document.getElementById('gemini-generate-counter');
+  if (el) el.innerText = sessionGenerateCount;
+  // Also update inside the selector if it was just re-rendered
+  // actually innerText check is enough if ID is unique
+}
+
+function incrementCounter() {
+  sessionGenerateCount++;
+  updateCounterUI();
+}
+
 function createGlobalRoomSelector() {
   if (globalRoomSelector) return globalRoomSelector;
 
@@ -751,7 +764,8 @@ function createGlobalRoomSelector() {
   selector.style.cssText = `
     position: fixed;
     top: 20px;
-    right: 20px;
+    left: 50%;
+    transform: translateX(-50%);
     background: ${CONFIG.THEME.secondary};
     border: 1px solid ${CONFIG.THEME.border};
     border-radius: 12px;
@@ -775,6 +789,17 @@ function createGlobalRoomSelector() {
       <span style="color: ${CONFIG.THEME.text}; font-size: 14px; font-weight: 500;">${currentRoom.name}</span>
     </div>
     <div style="display: flex; gap: 6px; align-items: center;">
+      <div id="gemini-generate-counter" title="Session Generations" style="
+        background: rgba(0,0,0,0.2);
+        color: ${CONFIG.THEME.success};
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: bold;
+        border: 1px solid ${CONFIG.THEME.border};
+        min-width: 20px;
+        text-align: center;
+      ">${sessionGenerateCount}</div>
       <div class="gemini-room-dropdown-trigger" style="
         background: ${CONFIG.THEME.primary};
         color: white;
@@ -812,6 +837,17 @@ function createGlobalRoomSelector() {
         <span style="color: ${CONFIG.THEME.text}; font-size: 14px; font-weight: 500;">${room.name}</span>
       </div>
       <div style="display: flex; gap: 6px; align-items: center;">
+        <div id="gemini-generate-counter" title="Session Generations" style="
+          background: rgba(0,0,0,0.2);
+          color: ${CONFIG.THEME.success};
+          padding: 4px 8px;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: bold;
+          border: 1px solid ${CONFIG.THEME.border};
+          min-width: 20px;
+          text-align: center;
+        ">${sessionGenerateCount}</div>
         <div class="gemini-room-dropdown-trigger" style="
           background: ${CONFIG.THEME.primary};
           color: white;
@@ -1105,6 +1141,7 @@ function addReplyButtonToMessage(message) {
       if (settings.get('notifications')) showNotification("Reply generated!", "success");
 
       setBtnLoading(genBtn, false, "✅ Done!");
+      incrementCounter();
     } catch (err) {
       console.error("❌ Error:", err);
       analytics.track('discord_generate_error', {
@@ -1246,6 +1283,7 @@ function addReplyButtonToMessage(message) {
         }
 
         setBtnLoading(quickBtn, false, "✅");
+        incrementCounter();
       } catch (err) {
         console.error("Quick generate error:", err);
         showNotification(`Failed to generate: ${err.message}`, "error");
@@ -1393,6 +1431,7 @@ function addReplyButtonToMessage(message) {
       await copyToClipboard(latestReply);
       showMiniToast(manualBtn, "Topic ✓ copied");
       setBtnLoading(manualBtn, false, "✅ Done!");
+      incrementCounter();
     } catch (err) {
       console.error("❌ Error:", err);
       alert("Gagal menghubungi backend lokal.");
@@ -1426,6 +1465,7 @@ function addReplyButtonToMessage(message) {
       const data = await res.json();
       if (data?.text) captionInput.value = data.text;
       setBtnLoading(translateBtn, false, "✅ Translated");
+      incrementCounter();
     } catch (e) {
       console.error(e);
       alert("Gagal translate.");
@@ -1458,6 +1498,7 @@ function addReplyButtonToMessage(message) {
       const data = await res.json();
       if (data?.text) captionInput.value = data.text;
       setBtnLoading(paraphraseBtn, false, "✅ Fixed");
+      incrementCounter();
     } catch (e) {
       console.error(e);
       alert("Gagal parafrase.");

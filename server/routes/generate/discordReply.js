@@ -325,7 +325,7 @@ ${roomExtraInfo ? `- ROOM-SPECIFIC INFO: ${roomExtraInfo}` : ''}
     2. Farewells: "later ${nickname || ''}", "see ya ${nickname || ''}"
     3. Short reactions: "nice ${nickname || ''}", "real ${nickname || ''}", "true ${nickname || ''}"
     4. Agreements: "facts ${nickname || ''}", "exactly ${nickname || ''}"
-    5. Casual responses: "all good ${nickname || ''}", "vibing ${nickname || ''}"
+    5. Casual responses: "all good ${nickname || ''}"
   
   * AVOID NICKNAME IN THESE CONTEXTS:
     1. Advice/suggestions: NEVER "hey ${nickname || ''}, get some rest" 
